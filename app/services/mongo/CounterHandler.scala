@@ -1,15 +1,17 @@
-package models
+package services.mongo
 
+import models.Counter
+import models.JsonFormats.counterFormat
 import play.api.Play._
+import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.json.Json
 import play.modules.reactivemongo.ReactiveMongoApi
+import play.modules.reactivemongo.json._
 import play.modules.reactivemongo.json.collection.JSONCollection
-import JsonFormats.counterFormat
+
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 import scala.util.Try
-import play.api.libs.concurrent.Execution.Implicits.defaultContext
-import play.modules.reactivemongo.json._
 /**
   * Created by P. Akhmedzianov on 16.03.2016.
   */

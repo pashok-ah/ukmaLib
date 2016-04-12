@@ -1,5 +1,6 @@
 package models
 
+import _root_.services.mongo.CounterHandler
 import models.Identity
 import play.api.libs.json._
 import securesocial.core._

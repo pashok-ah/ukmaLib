@@ -3,6 +3,7 @@ package models
 import models.Identity
 import play.api.libs.json._
 import securesocial.core.{BasicProfile, AuthenticationMethod, PasswordInfo, OAuth2Info}
+import services.mongo.CounterHandler
 
 import scala.util.{Failure, Success}
 
