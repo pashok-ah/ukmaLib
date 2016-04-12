@@ -1,6 +1,6 @@
-package sp
+package spark
 
-import javax.inject.{Singleton, Inject}
+import javax.inject.{Inject, Singleton}
 
 import services.mongo.MongoServicesHandler
 

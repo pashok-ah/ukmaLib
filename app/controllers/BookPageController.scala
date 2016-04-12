@@ -2,9 +2,11 @@ package controllers
 
 import javax.inject.Inject
 
-import imprt.AdditionalBooksInfoLoaderGoogleAPI
-import models.{Book, User, MyRating}
+import dataimport.AdditionalBooksInfoLoaderGoogleAPI
+import models.{MyRating, User}
+import play.api.Play.current
 import play.api.i18n.Messages
+import play.api.i18n.Messages.Implicits._
 import play.api.mvc.Action
 import play.api.routing.JavaScriptReverseRouter
 import reactivemongo.bson.BSONObjectID
@@ -12,11 +14,9 @@ import securesocial.core.SecureSocial
 import services.infoproviders.BookInfoProvider
 import services.mongo._
 import services.secsocial.MyEnvironment
-import play.api.Play.current
-import play.api.i18n.Messages.Implicits._
+
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
-import scala.util.Try
 
 /**
   * Created by P. Akhmedzianov on 05.04.2016.

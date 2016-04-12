@@ -3,7 +3,7 @@ package services.scheduler
 import javax.inject.{Inject, Singleton}
 
 import akka.actor.Actor
-import sp.{ContentBasedSparkRatingsRecommender, SubjectsSparkRecommender, MlLibAlsSparkRatingsFromMongoHandler, BookUpdater}
+import spark.{BookUpdater, ContentBasedSparkRatingsRecommender, MlLibAlsSparkRatingsFromMongoHandler}
 
 /**
   * Created by P. Akhmedzianov on 09.04.2016.

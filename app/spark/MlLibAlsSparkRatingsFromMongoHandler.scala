@@ -1,11 +1,11 @@
-package sp
+package spark
 
-import javax.inject.{Singleton, Inject}
+import javax.inject.{Inject, Singleton}
 
-import org.apache.spark.mllib.recommendation.{MatrixFactorizationModel, ALS, Rating}
+import org.apache.spark.mllib.recommendation.{ALS, MatrixFactorizationModel, Rating}
 import org.apache.spark.rdd.RDD
-import play.api.{Configuration, Play}
-import services.mongo.{MongoServicesHandler, UsersMongoService}
+import play.api.Configuration
+import services.mongo.MongoServicesHandler
 
 /**
   * Created by P. Akhmedzianov on 03.03.2016.

@@ -1,9 +1,9 @@
-package sp
+package spark
 
-import javax.inject.{Inject, Singleton}
+import javax.inject.Singleton
 
 import org.apache.spark.rdd.RDD
-import services.mongo.{MongoServicesHandler, BooksMongoService}
+import services.mongo.MongoServicesHandler
 
 /**
   * Created by P. Akhmedzianov on 31.03.2016.

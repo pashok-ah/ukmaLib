@@ -18,19 +18,14 @@ package controllers
 
 import javax.inject.Inject
 
-import models.User
 import _root_.services.infoproviders.BookInfoProvider
 import _root_.services.secsocial.MyEnvironment
-import dataload.{RatesToMongo, BooksToMongo, UsersToMongo}
-import sp.MlLibAlsSparkRatingsFromMongoHandler
-
-import securesocial.core._
-
-import play.api.i18n.Messages
-import play.api.mvc.{Action, RequestHeader}
+import models.User
 import play.api.Play.current
+import play.api.i18n.Messages
 import play.api.i18n.Messages.Implicits._
-
+import play.api.mvc.{Action, RequestHeader}
+import securesocial.core._
 
 import scala.concurrent.Future
 

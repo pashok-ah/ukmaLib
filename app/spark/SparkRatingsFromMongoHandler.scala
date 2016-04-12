@@ -1,12 +1,10 @@
-package sp
+package spark
 
-import com.mongodb.BasicDBList
 import com.mongodb.hadoop.MongoInputFormat
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.mllib.recommendation.Rating
 import org.apache.spark.rdd.RDD
 import org.bson.BSONObject
-import org.bson.types.ObjectId
 
 /**
   * Created by P. Akhmedzianov on 03.03.2016.

@@ -5,7 +5,6 @@ import javax.inject.Inject
 import models.User
 import securesocial.core.{AuthenticationMethod, BasicProfile}
 import services.mongo.UsersMongoService
-import services.secsocial.MyEnvironment
 
 /**
   * Created by P. Akhmedzianov on 16.02.2016.

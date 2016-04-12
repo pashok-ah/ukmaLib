@@ -1,14 +1,14 @@
 package dataload
 
-import java.util.{Map, LinkedHashMap}
+import java.util.{LinkedHashMap, Map}
 import javax.inject.Inject
 
 import models.MyRating
 import reactivemongo.bson.BSONObjectID
-import services.secsocial.MyEnvironment
+import services.mongo.{BooksMongoService, MyRatingMongoService}
+
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import services.mongo.{MyRatingMongoService, BooksMongoService}
 /**
   * Created by P. Akhmedzianov on 16.02.2016.
   */
