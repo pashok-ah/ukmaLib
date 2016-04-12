@@ -1,0 +1,70 @@
+@(userBasicProfile: securesocial.core.BasicProfile/*, recs: Map[Int, Double]*/)(implicit request: RequestHeader,
+        env: securesocial.core.RuntimeEnvironment,messages: Messages)
+    @import securesocial.core.IdentityProvider
+    @import securesocial.core.IdentityProvider
+    @import securesocial.core.providers.UsernamePasswordProvider
+    @import securesocial.core.AuthenticationMethod._
+    @import play.api.{Logger, Play}
+    @import helper._
+    @import play.api.Play
+
+    @main("SecureSocial - Sample Protected Page", userBasicProfile.fullName.get,
+        userBasicProfile.avatarUrl, false, None ) {
+        <div class="page-header">
+            <h2><img src="@userBasicProfile.avatarUrl.getOrElse("")"
+            alt="@userBasicProfile.firstName.getOrElse("")" width="40px" height="40px"/>
+                Welcome @userBasicProfile.firstName.getOrElse("")</h2>
+        </div>
+
+        <div class="clearfix">
+            <h2>User Details</h2>
+
+            <ul>
+                <li>User Id: @userBasicProfile.userId</li>
+                <li>Fist name: @userBasicProfile.firstName.getOrElse("")</li>
+                <li>Last name: @userBasicProfile.lastName.</li>
+            <li>Full name: @userBasicProfile.fullName.getOrElse("")</li>
+                <li>Logged in from: @userBasicProfile.providerId</li>
+                <li>Email: @userBasicProfile.email.map { email => @email }.getOrElse("Not Available")</li>
+                <li>Authentication method: @userBasicProfile.authMethod</li>
+            </ul>
+
+            @userBasicProfile.oAuth1Info.map { info =>
+                <h2>OAuth1 Info</h2>
+
+                <ul>
+                    <li>Token: @info.token</li>
+                    <li>Secret: @info.secret</li>
+                </ul>
+            }
+
+            @userBasicProfile.oAuth2Info.map { info =>
+                <h2>OAuth2 Info</h2>
+
+                <ul>
+                    <li>Access Token: @info.accessToken</li>
+                    @info.tokenType.map { t => <li>Token Type: @t</li> }
+                    @info.expiresIn.map { exp => <li>Expires in: @exp seconds</li> }
+                    @info.refreshToken.map { rt => <li>Refresh Token: @rt</li> }
+                </ul>
+            }
+
+@*            <h2>Recommendations</h2>
+            <ul>
+                @for(p <- recs) {
+                    <li>Book Id: @p._1</li>
+                    <li>Predicted Rating: @p._2</li>
+                }
+
+            </ul>*@
+
+            @userBasicProfile.passwordInfo.map { info =>
+                <hr>
+                <a class="btn" href="@env.routes.passwordChangeUrl">Change Password</a>
+                <hr>
+            }
+
+
+            <a class="btn" href="@securesocial.controllers.routes.LoginPage.logout()">Logout</a>
+        </div>
+    }

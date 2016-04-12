@@ -1,0 +1,30 @@
+@(listName:String, bookListOption:Option[List[Book]])
+
+<div class="products">
+    <h3>@listName</h3>
+    <ul>
+        @if(bookListOption.isDefined && bookListOption.get.nonEmpty) {
+            @for(book <- bookListOption.get) {
+                <li>
+                    <div class="product">
+                        <a href="/book/@book._id" class="info">
+                            <span class="holder">
+                                <img src="@book.imageURLMedium" alt="" />
+                                <span class="book-name">@book.bookTitle</span>
+                                <span class="author">by @book.bookAuthor</span>
+                                <span class="description">
+                                    @if(book.description.isDefined) {
+                                        <p class="truncate-description">@book.description.get</p>
+                                    }else{
+                                        <p class="truncate-description">No description</p>
+                                    }</span>
+                            </span>
+                        </a>
+                    </div>
+                </li>
+            }
+        } else{
+            <p>No books in the list</p>
+        }
+     </ul>
+</div>

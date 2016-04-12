@@ -1,0 +1,103 @@
+@(book: Book, similarBooksBySybjectsListOption: Option[List[Book]],youMayAlsoLikeBookListOption: Option[List[Book]],
+        rateOption: Option[MyRating], userName: String, userAvatarOption: Option[String])(implicit messages: Messages,
+        env: securesocial.core.RuntimeEnvironment)
+
+@main(book.bookTitle, userName, userAvatarOption, false, None) {
+    <!-- Sidebar -->
+
+    <!-- End Sidebar -->
+    <!-- Content -->
+    <div id="book-page">
+
+            <!-- Products -->
+            <div id="image-and-rating">
+                <img src=@book.imageURLLarge  width="320px" height="500px" alt="No image available" />
+                @if(userName != "Guest") {
+                    @if(rateOption.isDefined) {
+                        <div id="user-rate">
+                        <div id="user-rate-info">Your rate: @rateOption.get.rate</div>
+                        <button id="delete-rate-button">Delete</button>
+                            </div>
+                        <div id="my-rating" data-rating=@rateOption.get.rate data-book-id= @book._id
+                        data-myrating-objectid =@rateOption.get._id.get.stringify></div>
+                    }else{
+                        <div id="user-rate">
+                         <div id="user-rate-info">Rate this book:</div>
+                            <button id="delete-rate-button">Delete</button>
+                            </div>
+                        <div id="my-rating" data-rating=0 data-book-id= @book._id data-myrating-objectid=0></div>
+
+                    }
+                }
+            </div>
+
+        <div class="book-info">
+            <h2>@book.bookTitle</h2>
+            <div id="global-rating-block">
+                @if(book.globalRate.isDefined) {
+
+                    <div id="global-rating" data-rating=
+                        @book.globalRate.get
+                    ></div>
+                    <span id="global-rating-number">@book.globalRate.get</span>
+                    <p>  Rates: @book.numberOfRates</p>
+                } else{
+                    <p>No global rating</p>
+                }
+                    <!-- Book info block -->
+                </div>
+            <table class="book-info-table">
+                <tbody>
+                    <tr><td class="type">ISBN</td><td><a href="#">@book.isbn</a></td></tr>
+                    <tr><td class="type">Author</td><td><a href="#">@book.bookAuthor</a></td></tr>
+                    <tr><td class="type">Year</td><td><a href="#">@book.yearOfPublication</a></td></tr>
+                    <tr><td class="type">Publisher</td><td><a href="#">@book.publisher</a></td></tr>
+                </tbody>
+            </table>
+            <h3>Subjects</h3>
+            <div id="subjects">
+@*                @book.subjects.length match {
+                    case x if x <= 5 => {
+                        <ul id="single">}
+                    case x if (x > 5 && x <= 10) => {
+                        <ul id="double">}
+                    case x if (x > 10 && x <= 15) => {
+                        <ul id="triple">}
+                    case _ => {
+                        <ul id="quad">}
+                }*@
+               <p>
+                @for(subject <- book.subjects) {
+                    <a href="#">#@subject&nbsp;</a>
+                }
+                </p>
+            @*</ul>*@
+            </div>
+            <h3>Description</h3>
+            @if(book.description.isDefined) {
+                <div id="book-big-description-truncate">@book.description.get
+                <a class='more' href='#'>More</a>
+                </div>
+            } else {
+                <p id="book-big-description-truncate">No description available.</p>
+            }
+        </div>
+        <!-- End of book info block -->
+        <div class="cl">&nbsp;</div>
+    @views.html.elements.sidebar()
+    <div id="similar-books-lists">
+        @if(similarBooksBySybjectsListOption.isDefined){
+            @views.html.elements.bookList("Similar books by subjects",similarBooksBySybjectsListOption.get)
+        }
+        @if(youMayAlsoLikeBookListOption.isDefined){
+            @views.html.elements.bookList("If you like this, you may also like",youMayAlsoLikeBookListOption.get)
+        }
+    </div>
+        <!-- End Content -->
+    <div class="cl">&nbsp;</div>
+
+        <!-- End Best-sellers -->
+    </div>
+
+
+}

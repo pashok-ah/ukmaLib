@@ -1,0 +1,31 @@
+@(bookList:List[Book])
+<div id="slider">
+    <div class="shell">
+        <ul>
+            @for(book <-bookList) {
+                <li>
+                    <div class="image">
+                        <img src=@book.imageURLLarge  width="190px" height="300px" alt="" />
+                    </div>
+                    <div class="details">
+                        <h2>ukma Lib</h2>
+                        <h3>Most Popular</h3>
+                        <p class="title">@book.bookTitle</p>
+                        @if(book.description.isDefined){
+                            <p class="description-slider">@book.description.get</p>
+                        }else {
+                            <p class="description-slider">No description.</p>
+                        }
+                        <a href="/book/@book._id" class="read-more-btn">Read More</a>
+                    </div>
+                </li>
+            }
+        </ul>
+        <div class="nav">
+            @for(i <- 1 to bookList.size) {
+                <a href="#">@i</a>
+            }
+        </div>
+    </div>
+</div>
+    <!-- End Slider -->

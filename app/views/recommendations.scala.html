@@ -1,0 +1,23 @@
+@(userName: String, userAvatarOption: Option[String],
+        flatBookList:Option[List[Book]])(implicit messages: Messages,
+        env: securesocial.core.RuntimeEnvironment)
+
+@main("Personal Recommendations", userName, userAvatarOption, false, None) {
+    <!-- Sidebar -->
+    @views.html.elements.sidebar()
+    <!-- End Sidebar -->
+    <!-- Content -->
+    <div id="content">
+            <!-- Products -->
+        @views.html.elements.flatBookList("Personal recommendations for you", flatBookList)
+            <!-- End Products -->
+        <div class="cl">&nbsp;</div>
+            <!-- Best-sellers -->
+        <div class="center">
+
+        </div>
+            <!-- End Best-sellers -->
+    </div>
+        <!-- End Content -->
+    <div class="cl">&nbsp;</div>
+}

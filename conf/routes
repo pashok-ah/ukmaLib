@@ -1,0 +1,38 @@
+# Routes
+# This file defines all application routes (Higher priority routes first)
+# ~~~~
+
+# Home page
+GET        /                                  @controllers.Application.index
+GET        /recommendations                   @controllers.Application.recommendations
+GET        /book/:bookId                      @controllers.BookPageController.getBook(bookId:Int)
+PUT        /book/:bookId/:rate                @controllers.BookPageController.saveTheRateAjaxCall(bookId:Int, rate:Double, isAjaxCall :Boolean ?= false)
+
+POST       /rating/:id/:rate                  @controllers.BookPageController.updateTheRateAjaxCall(id:String, rate:Double, isAjaxCall :Boolean ?= false)
+POST       /user/:bookid/:rate                @controllers.BookPageController.updateTheNewRateAjaxCall(bookid:Int, rate:Double, isAjaxCall :Boolean ?= false)
+
+DELETE     /rating/deletebyid/:id             @controllers.BookPageController.deleteTheRateAjaxCall(id:String, isAjaxCall :Boolean ?= false)
+DELETE     /rating/deletebybookid/:bookid     @controllers.BookPageController.deleteTheNewRateAjaxCall(bookid:Int, isAjaxCall :Boolean ?= false)
+
+GET        /profile                           @controllers.Application.profileInfo
+
+GET        /assets/javascripts/routes         @controllers.BookPageController.javascriptRoutes()
+
+
+GET        /only-twitter        @controllers.Application.onlyTwitter
+GET        /current-user        @controllers.Application.currentUser
+GET        /custom/login        @controllers.CustomLoginController.login
+GET        /custom/logout       @controllers.CustomLoginController.logout
+
+GET        /import/users        @controllers.ImportController.importUsers
+GET        /import/books        @controllers.ImportController.importBooks
+GET        /import/ratings      @controllers.ImportController.importRatings
+
+GET        /testMongoImport     @controllers.Application.testFromMongoToRddImport
+
+# Map static resources from the /public folder to the /assets URL path
+GET        /assets/*file        controllers.Assets.at(path="/public", file)
+->         /auth                securesocial.Routes
+
+
+    

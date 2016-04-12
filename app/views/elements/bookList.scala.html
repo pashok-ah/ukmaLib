@@ -1,0 +1,18 @@
+@(listName:String, bookList:List[Book])
+
+<div id="book-list">
+    <h3>@listName</h3>
+    <ul>
+        @for(book <- bookList) {
+            <li>
+                <div class="product">
+                    <a href="/book/@book._id">
+                        <img src="@book.imageURLMedium" alt="" />
+                        <span class="book-name">@book.bookTitle </span>
+                        <span class="author">by @book.bookAuthor </span>
+                    </a>
+                </div>
+            </li>
+        }
+    </ul>
+</div>

@@ -1,0 +1,23 @@
+@(userName: String, userAvatarOption: Option[String], sliderListOption:Option[List[Book]],
+        flatBookList:Option[List[Book]])(implicit messages: Messages,
+        env: securesocial.core.RuntimeEnvironment)
+
+@main("Index page", userName, userAvatarOption, true, sliderListOption) {
+    <!-- Sidebar -->
+    @views.html.elements.sidebar()
+    <!-- End Sidebar -->
+    <!-- Content -->
+    <div id="content">
+            <!-- Products -->
+        @views.html.elements.flatBookList("New Releases", flatBookList)
+            <!-- End Products -->
+        <div class="cl">&nbsp;</div>
+            <!-- Best-sellers -->
+            <div class="center">
+
+                </div>
+            <!-- End Best-sellers -->
+    </div>
+        <!-- End Content -->
+    <div class="cl">&nbsp;</div>
+}
