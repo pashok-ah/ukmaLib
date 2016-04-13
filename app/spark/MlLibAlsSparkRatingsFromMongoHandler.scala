@@ -5,17 +5,21 @@ import javax.inject.{Inject, Singleton}
 import org.apache.spark.mllib.recommendation.{ALS, MatrixFactorizationModel, Rating}
 import org.apache.spark.rdd.RDD
 import play.api.Configuration
-import services.mongo.MongoServicesHandler
-
 /**
   * Created by P. Akhmedzianov on 03.03.2016.
   */
 @Singleton
 class MlLibAlsSparkRatingsFromMongoHandler @Inject() (val configuration: Configuration)
   extends SparkRatingsFromMongoHandler with java.io.Serializable{
+
   val configurationPath_ = configuration.getString(
     "mlLibAlsSparkRatingsFromMongoHandler.configurationPath").getOrElse(
     SparkAlsPropertiesLoader.defaultPath)
+  val ratingsCollectionName_ = configuration.getString("mongodb.ratingsCollectionName")
+    .getOrElse(RATINGS_DEFAULT_COLLECTION_NAME)
+  val usersCollectionName_ = configuration.getString("mongodb.usersCollectionName")
+    .getOrElse(USERS_DEFAULT_COLLECTION_NAME)
+
   var alsConfigurationOption_ : Option[AlsConfiguration] = None
 
   var matrixFactorizationModelOption_ : Option[MatrixFactorizationModel] = None
@@ -24,6 +28,16 @@ class MlLibAlsSparkRatingsFromMongoHandler @Inject() (val configuration: Configu
   var validationRatingsRddOption_ : Option[RDD[Rating]] = None
   var testRatingsRddOption_ : Option[RDD[Rating]] = None
 
+  def test(): Unit = {
+    matrixFactorizationModelOption_ match {
+      case Some(matrixModel) =>
+        println("Train RMSE = " + getRmseForRdd(trainRatingsRddOption_.get))
+        println("Validation RMSE = " + getRmseForRdd(validationRatingsRddOption_.get))
+        println("Test MAP@K = " + getMeanAveragePrecisionForRdd(testRatingsRddOption_.get))
+      case None => throw new IllegalStateException()
+    }
+  }
+
   def initialize(isTuningParameters: Boolean, isInitializingValidationRdd: Boolean,
                  isInitializingTestRdd: Boolean, isFilteringInput:Boolean): Unit = {
     if (isTuningParameters && !isInitializingValidationRdd){
@@ -31,8 +45,9 @@ class MlLibAlsSparkRatingsFromMongoHandler @Inject() (val configuration: Configu
     }
     else {
       alsConfigurationOption_ = Some(SparkAlsPropertiesLoader.loadFromDisk(configurationPath_))
-      initializeRdds(getRatingsCollectionToRdd(isFilteringInput), isInitializingValidationRdd,
-        isInitializingTestRdd)
+      initializeRdds(filterInputByNumberOfKeyEntriesRdd(getKeyValueRatings(
+        getCollectionFromMongoRdd(ratingsCollectionName_)),10),
+        isInitializingValidationRdd, isInitializingTestRdd)
       if (isTuningParameters) tuneHyperParametersWithGridSearch()
       initializeModelWithRdd(trainRatingsRddOption_.get)
     }
@@ -104,7 +119,6 @@ class MlLibAlsSparkRatingsFromMongoHandler @Inject() (val configuration: Configu
                      isInitializingTestRdd: Boolean): Unit = {
     if ((isInitializingValidationRdd || isInitializingTestRdd) && alsConfigurationOption_.isDefined) {
       val gropedByKeyRdd = filteredInputRdd.groupByKey()
-      System.out.println("Number of users after filtering:" + gropedByKeyRdd.count())
 
       val trainRdd = gropedByKeyRdd.map { groupedLine =>
         val movieRatePairsArray = groupedLine._2.toArray
@@ -134,33 +148,6 @@ class MlLibAlsSparkRatingsFromMongoHandler @Inject() (val configuration: Configu
     }
   }
 
-  def predict(user: Int, product: Int): Double = {
-    matrixFactorizationModelOption_ match {
-      case Some(matrixModel) =>
-        matrixModel.predict(user, product)
-      case None => throw new IllegalStateException()
-    }
-  }
-
-  def recommendProducts(user: Int, num: Int): Map[Int, Double] = {
-    matrixFactorizationModelOption_ match {
-      case Some(matrixModel) =>
-        def resFromModel = matrixModel.recommendProducts(user, num)
-        def res = resFromModel.map(rate => (rate.product -> rate.rating)).toMap
-        res
-      case None => throw new IllegalStateException()
-    }
-  }
-
-  def test(): Unit = {
-    matrixFactorizationModelOption_ match {
-      case Some(matrixModel) =>
-        println("Train RMSE = " + getRmseForRdd(trainRatingsRddOption_.get))
-        println("Validation RMSE = " + getRmseForRdd(validationRatingsRddOption_.get))
-        println("Test MAP@K = " + getMeanAveragePrecisionForRdd(testRatingsRddOption_.get))
-      case None => throw new IllegalStateException()
-    }
-  }
 
   private def getRmseForRdd(ratings: RDD[Rating]): Double = {
     // Evaluate the model on rating data
@@ -194,7 +181,6 @@ class MlLibAlsSparkRatingsFromMongoHandler @Inject() (val configuration: Configu
         case Rating(user, product, rate) =>
           (user, product)
       }.groupByKey()
-      println("usersWithPositiveRatings" + usersWithPositiveRatings.count())
       val predictions = matrixFactorizationModelOption_.get.recommendProductsForUsers(K).map {
         case (userId, ratingPredictions) => (userId, ratingPredictions.map {
           case Rating(user, product, rate) => product
@@ -224,12 +210,38 @@ class MlLibAlsSparkRatingsFromMongoHandler @Inject() (val configuration: Configu
         numberOfRecommendations).mapValues{arrayRatings => arrayRatings.map{
         case Rating(userId, bookId, rate) => bookId
       }}
-      val collectedPredictions = predictionsRdd.collect()
-      collectedPredictions.foreach{
-        case (userId, bookIdsArray) => {
-          MongoServicesHandler.usersMongoService.updateRecommendations(userId,bookIdsArray)
-        }
-      }
+      updateMongoCollectionWithRdd(usersCollectionName_,
+        predictionsRdd.map { resTuple =>
+          (new Object, getMongoUpdateWritableFromIdValueTuple[Int, Array[Int]](resTuple, "_id",
+            "personalRecommendations"))
+        })
+    }
+  }
+
+  def filterInputByNumberOfKeyEntriesRdd(inputRdd: RDD[(Int, (Int, Double))],
+                                         threshold: Int): RDD[(Int, (Int, Double))] = {
+    val filteredRatingsRdd = inputRdd.groupByKey().filter { groupedLine =>
+      groupedLine._2.size >= threshold
+    }.flatMapValues(x => x)
+    filteredRatingsRdd
+  }
+
+
+  def predict(user: Int, product: Int): Double = {
+    matrixFactorizationModelOption_ match {
+      case Some(matrixModel) =>
+        matrixModel.predict(user, product)
+      case None => throw new IllegalStateException()
+    }
+  }
+
+  def recommendProducts(user: Int, num: Int): Map[Int, Double] = {
+    matrixFactorizationModelOption_ match {
+      case Some(matrixModel) =>
+        def resFromModel = matrixModel.recommendProducts(user, num)
+        def res = resFromModel.map(rate => (rate.product -> rate.rating)).toMap
+        res
+      case None => throw new IllegalStateException()
     }
   }
 }

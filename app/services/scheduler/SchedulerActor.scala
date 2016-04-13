@@ -3,25 +3,26 @@ package services.scheduler
 import javax.inject.{Inject, Singleton}
 
 import akka.actor.Actor
-import spark.{BookUpdater, ContentBasedSparkRatingsRecommender, MlLibAlsSparkRatingsFromMongoHandler}
+import spark.{BookGlobalRatingsUpdater, ContentBasedSparkRatingsRecommender, MlLibAlsSparkRatingsFromMongoHandler, SubjectsSparkRecommender}
 
 /**
   * Created by P. Akhmedzianov on 09.04.2016.
   */
 @Singleton
-class SchedulerActor @Inject() (bookUpdater : BookUpdater,
+class SchedulerActor @Inject() (bookUpdater : BookGlobalRatingsUpdater,
                                 mlLibAlsSparkRatingsFromMongoHandler: MlLibAlsSparkRatingsFromMongoHandler,
-                                contentBasedSparkRatingsRecommender: ContentBasedSparkRatingsRecommender)
+                                contentBasedSparkRatingsRecommender: ContentBasedSparkRatingsRecommender,
+                                subjectsSparkRecommender: SubjectsSparkRecommender)
   extends Actor {
   def receive = {
     case "updateRatings" => updateRatingsInDb()
     case "updatePersonalRecommendations" => updatePersonalReommendationsInDb()
     case "updateYouMayAlsoLikeBooks" => updateYouMayAlsoLikeBooks()
+    case "updateSimilarBooks" => updateSimilarBooks()
   }
 
   def updateRatingsInDb(): Unit ={
     println("Updating...")
-    bookUpdater.initializeRatings()
     bookUpdater.setRateCountsAndGlobalRatings()
   }
 
@@ -34,5 +35,13 @@ class SchedulerActor @Inject() (bookUpdater : BookUpdater,
     println("Updating similar books...")
     contentBasedSparkRatingsRecommender.updateYouMayAlsoLikeBooks()
   }
+
+
+  def updateSimilarBooks(): Unit ={
+    println("Updating similar books...")
+    subjectsSparkRecommender.updateSimilarBooks()
+  }
+
+
 
 }

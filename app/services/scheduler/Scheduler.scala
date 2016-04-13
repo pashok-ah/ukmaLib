@@ -1,10 +1,12 @@
 package services.scheduler
 
 import javax.inject.{Inject, Named}
-import play.api.{Configuration, Play}
-import akka.actor.{ActorSystem, ActorRef}
-import scala.concurrent.duration._
+
+import akka.actor.{ActorRef, ActorSystem}
+import play.api.Configuration
+
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 
 /**
   * Created by P. Akhmedzianov on 09.04.2016.
@@ -29,6 +31,8 @@ class Scheduler @Inject()(val system: ActorSystem, @Named("scheduler-actor") val
     schedulerActor, "updateRatings")
   system.scheduler.schedule( updateYouMayAlsoLikeBooksInitial, updateYouMayAlsoLikeBooksPeriod,
     schedulerActor, "updateYouMayAlsoLikeBooks")
+  system.scheduler.schedule( 30 days, 30 days,
+    schedulerActor, "updateSimilarBooks")
 
   def configMilliseconds(key: String, default: FiniteDuration): FiniteDuration =
     configuration.getMilliseconds(key).map(_.milliseconds).getOrElse(default)

@@ -1,11 +1,13 @@
 package spark
 
-import com.mongodb.hadoop.MongoInputFormat
+
+import com.mongodb.BasicDBObject
+import com.mongodb.hadoop.io.MongoUpdateWritable
+import com.mongodb.hadoop.{MongoInputFormat, MongoOutputFormat}
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.mllib.recommendation.Rating
 import org.apache.spark.rdd.RDD
 import org.bson.BSONObject
-
 /**
   * Created by P. Akhmedzianov on 03.03.2016.
   */
@@ -13,8 +15,11 @@ trait SparkRatingsFromMongoHandler {
   val MIN_NUMBER_OF_RATES_FOR_USER = 11
   val MIN_NUMBER_OF_RATES_FOR_BOOK = 11
 
-  val RATINGS_COLLECTION_NAME = "ratings"
-  val BOOKS_COLLECTION_NAME = "booksShortened"
+  val RATINGS_DEFAULT_COLLECTION_NAME = "ratings"
+  val BOOKS_DEFAULT_COLLECTION_NAME = "booksShortened"
+  val USERS_DEFAULT_COLLECTION_NAME = "users"
+
+  val defaultMongoDbUri = "mongodb://localhost:27017/BookRecommenderDB"
 
   def transformToRatingRdd(inputRdd:RDD[(Int, (Int, Double))]):RDD[Rating]={
     inputRdd.map(inputLine => new Rating(inputLine._1, inputLine._2._1, inputLine._2._2))
@@ -24,66 +29,52 @@ trait SparkRatingsFromMongoHandler {
     inputRdd.map{case Rating(user, product, rate) => (user,(product,rate))}
   }
 
-  def getRatingsCollectionToRdd(isFilteringInput:Boolean): RDD[(Int, (Int, Double))] = {
+  def getCollectionFromMongoRdd(inputCollectionName: String):
+  RDD[(Object, BSONObject)] = {
     val mongoConfiguration = new Configuration()
     mongoConfiguration.set("mongo.input.uri",
-      play.Play.application.configuration.getString("mongodb.uri") + "." + RATINGS_COLLECTION_NAME)
+      play.Play.application.configuration.getString("mongodb.uri") + "." + inputCollectionName)
     // Create an RDD backed by the MongoDB collection.
-    val fromMongoRatingsRdd = SparkCommons.sc.newAPIHadoopRDD(
+    val fromMongoRdd = SparkCommons.sc.newAPIHadoopRDD(
       mongoConfiguration, // Configuration
       classOf[MongoInputFormat], // InputFormat
       classOf[Object], // Key type
       classOf[BSONObject]) // Value type
-    val inputRdd = fromMongoRatingsRdd.map(arg => {
-        (arg._2.get("users_id").asInstanceOf[Int], (arg._2.get("books_id").asInstanceOf[Int],
-          arg._2.get("rate").asInstanceOf[Double]))
-      })
-    if(isFilteringInput) {
-      // filtering the users with number of rates less than MIN_NUMBER_OF_RATES_FOR_USER
-      // after that, filtering books with number of raters less than MIN_NUMBER_OF_RATES_FOR_BOOK
-      val filteredInputRdd = filterInputByNumberOfKeyEntriesRdd(
-        filterInputByNumberOfKeyEntriesRdd(inputRdd, MIN_NUMBER_OF_RATES_FOR_USER).map {
-          case (userId, (bookId, rate)) => (bookId, (userId, rate))
-        },
-        MIN_NUMBER_OF_RATES_FOR_BOOK).map {
-        case (bookId, (userId, rate)) => (userId, (bookId, rate))
-      }
-      println("Number of rates after filtering:"+filteredInputRdd.count())
-      filteredInputRdd
-    }
-    else{
-      inputRdd
-    }
+    System.out.println("Read from Mongo:" + fromMongoRdd.count())
+    fromMongoRdd
   }
 
-  def getBooksCollectionToRdd(): RDD[(Int, (Int, Option[Double]))] = {
-    val mongoConfiguration = new Configuration()
-    mongoConfiguration.set("mongo.input.uri",
-      play.Play.application.configuration.getString("mongodb.uri") + "." + BOOKS_COLLECTION_NAME)
-    // Create an RDD backed by the MongoDB collection.
-    val booksRdd = SparkCommons.sc.newAPIHadoopRDD(
-      mongoConfiguration, // Configuration
-      classOf[MongoInputFormat], // InputFormat
-      classOf[Object], // Key type
-      classOf[BSONObject]) // Value type
-    val res = booksRdd.map(arg => {
-        val optionRatio = if( arg._2.get("globalRate").isInstanceOf[Double])
-          Some(arg._2.get("globalRate").asInstanceOf[Double]) else None
-        (arg._2.get("_id").asInstanceOf[Int],
-          (arg._2.get("numberOfRates").asInstanceOf[Int],
-            optionRatio))
-      })
-    System.out.println("Read books from Mongo:" + res.count())
+  def updateMongoCollectionWithRdd(updateCollectionName:String,
+                                   toMongoUpdateRdd:RDD[(Object, MongoUpdateWritable)]): Unit ={
+    val outputConfig = new Configuration()
+    outputConfig.set("mongo.output.uri",
+      play.Play.application.configuration.getString("mongodb.uri") + "." +
+        updateCollectionName)
+    toMongoUpdateRdd.saveAsNewAPIHadoopFile(
+      "file:///this-is-completely-unused",
+      classOf[Object],
+      classOf[MongoUpdateWritable],
+      classOf[MongoOutputFormat[Object, MongoUpdateWritable]],
+      outputConfig)
+  }
+
+  def getKeyValueRatings(inputRdd: RDD[(Object, BSONObject)]):
+  RDD[(Int, (Int, Double))]={
+    val res = inputRdd.map(arg => {
+      (arg._2.get("users_id").asInstanceOf[Int], (arg._2.get("books_id").asInstanceOf[Int],
+        arg._2.get("rate").asInstanceOf[Double]))
+    })
     res
   }
 
-  def filterInputByNumberOfKeyEntriesRdd(inputRdd: RDD[(Int, (Int, Double))],
-                                         threshold: Int): RDD[(Int, (Int, Double))] = {
-    val filteredRatingsRdd = inputRdd.groupByKey().filter { groupedLine =>
-      val movieRatePairsArray = groupedLine._2.toArray
-      movieRatePairsArray.size >= threshold
-    }.flatMapValues(x => x)
-    filteredRatingsRdd
+  def getMongoUpdateWritableFromIdValueTuple[ID,VAL](tuple:(ID, VAL), idFieldName:String,
+                                                     valueFieldName:String):MongoUpdateWritable={
+    new MongoUpdateWritable(
+      new BasicDBObject(idFieldName, tuple._1),  // Query
+      new BasicDBObject("$set", new BasicDBObject(valueFieldName, tuple._2)),  // Update operation
+      false,  // Upsert
+      false   // Update multiple documents
+    )
   }
 }
 

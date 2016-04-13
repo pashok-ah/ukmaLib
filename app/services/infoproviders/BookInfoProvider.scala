@@ -18,11 +18,11 @@ class BookInfoProvider @Inject() (booksMongoService: BooksMongoService) {
   val popularBooksIndexFlatList = Array(6661,66661,666661,1011,2551,10000)
 
   def getMainSliderBooks():Option[List[Book]]={
-    Some(getBookEntitiesByIdArray(mainSliderBooks).get)
+    getBookEntitiesByIdArray(mainSliderBooks)
   }
 
   def popularBooksForIndexFlatList():Option[List[Book]]={
-    Some(getBookEntitiesByIdArray(popularBooksIndexFlatList).get)
+    getBookEntitiesByIdArray(popularBooksIndexFlatList)
   }
 
   def getBookEntitiesByIdArray(arrayOfId: Array[Int]): Option[List[Book]] = {
