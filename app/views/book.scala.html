@@ -1,7 +1,8 @@
 @(book: Book, similarBooksBySybjectsListOption: Option[List[Book]],youMayAlsoLikeBookListOption: Option[List[Book]],
-        rateOption: Option[MyRating], userName: String, userAvatarOption: Option[String])(implicit messages: Messages,
-        env: securesocial.core.RuntimeEnvironment)
+        rateOption: Option[MyRating], userName: String, userAvatarOption: Option[String])
 
+    @import play.api.Play.current
+    @import play.api.i18n.Messages.Implicits._
 @main(book.bookTitle, userName, userAvatarOption, false, None) {
     <!-- Sidebar -->
 

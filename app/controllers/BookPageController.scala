@@ -4,9 +4,6 @@ import javax.inject.Inject
 
 import dataimport.AdditionalBooksInfoLoaderGoogleAPI
 import models.{MyRating, User}
-import play.api.Play.current
-import play.api.i18n.Messages
-import play.api.i18n.Messages.Implicits._
 import play.api.mvc.Action
 import play.api.routing.JavaScriptReverseRouter
 import reactivemongo.bson.BSONObjectID
@@ -65,49 +62,49 @@ class BookPageController @Inject()(override implicit val env: MyEnvironment,
         }
         Ok(views.html.book(book, bookInfoProvider.getBookEntitiesByIdArray(book.similarBooks),
           bookInfoProvider.getBookEntitiesByIdArray(book.youMayAlsoLikeBooks), rateOption, userName,
-          userAvatarUrlOption)(implicitly[Messages], implicitly[MyEnvironment]))
+          userAvatarUrlOption))
       }
       else {
-        NotFound
+        NotFound(views.html.errors.error("Book not found", request.uri,userName, userAvatarUrlOption))
       }
     }
   }
 
-  def saveTheRateAjaxCall(bookId: Int, rate: Double) = SecuredAction { implicit request =>
+  def saveTheRateAjaxCall(bookId: Int, rate: Double) = SecuredAction.async { implicit request =>
     if (isRateInBorders(rate)) {
       val createResultFuture = myRatingsMongoService.create(new MyRating(None,
         request.user.userIntId.get, bookId, rate))
       val resultMessage = awaitAndReturnBookId(createResultFuture)
-      Ok(resultMessage)
+      Future.successful(Ok(resultMessage))
     }
     else {
-      Ok("Error")
+      Future.successful(Ok("Error"))
     }
   }
 
-  def updateTheRateAjaxCall(myRatingId: String, rate: Double) = SecuredAction { implicit request =>
+  def updateTheRateAjaxCall(myRatingId: String, rate: Double) = SecuredAction.async { implicit request =>
     val bsonMyRatingIdTry = BSONObjectID.parse(myRatingId)
     if (bsonMyRatingIdTry.isSuccess && isRateInBorders(rate)) {
       val updateFuture = myRatingsMongoService.updateExistingRating(bsonMyRatingIdTry.get, rate)
       val awaitResult = Await.ready(updateFuture, awaitDuration_).value.get
       if(awaitResult.isSuccess && awaitResult.get.ok)
-        Ok("Success")
+        Future.successful(Ok("Success"))
       else
-        Ok("Error")
+        Future.successful(Ok("Error"))
     }
     else {
-      Ok("Error")
+      Future.successful(Ok("Error"))
     }
   }
 
-  def deleteTheRateAjaxCall(myRatingId: String) = SecuredAction { implicit request =>
+  def deleteTheRateAjaxCall(myRatingId: String) = SecuredAction.async { implicit request =>
     val bsonMyRatingIdTry = BSONObjectID.parse(myRatingId)
     if (bsonMyRatingIdTry.isSuccess) {
       myRatingsMongoService.delete(bsonMyRatingIdTry.get)
-      Ok("Success")
+      Future.successful(Ok("Success"))
     }
     else {
-      Ok("Error")
+      Future.successful(Ok("Error"))
     }
   }
 
@@ -123,18 +120,17 @@ class BookPageController @Inject()(override implicit val env: MyEnvironment,
     resultMessage
   }
 
-  def javascriptRoutes = Action { implicit request =>
-    Ok(
-      JavaScriptReverseRouter("jsRoutes", Some("myAjaxFunction"))(
+  def javascriptRoutes = Action.async{ implicit request =>
+    Future.successful(Ok(
+      JavaScriptReverseRouter("jsRoutes")(
         routes.javascript.BookPageController.saveTheRateAjaxCall,
         routes.javascript.BookPageController.updateTheRateAjaxCall,
         routes.javascript.BookPageController.deleteTheRateAjaxCall
       )
-    ).as("text/javascript")
+    ).as("text/javascript"))
   }
 
   def handleBookDescription(isbn: String, bookId: Int): String = {
-    //if no description in database, trying to load from google books api
     var resultDescription = "No description."
     val description = additionalInfoLoader_.getInfoByIsbn(isbn)
     if (description != "None") resultDescription = description

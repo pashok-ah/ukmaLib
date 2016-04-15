@@ -1,0 +1,8 @@
+@(message:String, uri:String,
+        userName: String, userAvatarOption: Option[String])
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
+@main(message, userName, userAvatarOption, false, None) {
+ <h3>@message</h3>
+    <p>@uri</p>
+}

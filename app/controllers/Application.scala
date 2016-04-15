@@ -33,6 +33,7 @@ import scala.concurrent.Future
 class Application @Inject()(override implicit val env: MyEnvironment,
                             bookInfoProvider : BookInfoProvider)
   extends securesocial.core.SecureSocial {
+
   def index = Action.async { implicit request =>
     var userName = "Guest"
     var userAvatarUrlOption : Option[String]= None
@@ -61,8 +62,6 @@ class Application @Inject()(override implicit val env: MyEnvironment,
   def onlyTwitter = SecuredAction(WithProvider("facebook")) { implicit request =>
     Ok("You can see this because you logged in using Twitter")
   }
-
-
 
   def testFromMongoToRddImport = Action {
     Ok("Imported!!!")
