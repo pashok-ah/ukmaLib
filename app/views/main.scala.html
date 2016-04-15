@@ -1,5 +1,4 @@
-@(title: String, userName:String, userAvatarOption:Option[String],
-        isBuildSlider:Boolean, sliderListOption: Option[List[Book]])(content: Html)(implicit messages: Messages)
+@(title: String, userName:String, userAvatarOption:Option[String])(content: Html)(implicit messages: Messages)
 <html lang="en-US" xmlns="http://www.w3.org/1999/xhtml" dir="ltr">
     <head>
         <title>@Messages("appName") - @title</title>
@@ -53,15 +52,10 @@
                 <!-- End Login-details -->
         </div>
             <!-- End Header -->
-            <!-- Slider -->
-            @if(isBuildSlider && sliderListOption.isDefined){
-                @views.html.elements.slider(sliderListOption.get)
-            }
-            <!-- End Slider -->
 
-        <div id="main" class="shell">
+
         @content
-        </div>
+
             <!-- Footer -->
         <div id="footer" class="shell">
             <div class="top">

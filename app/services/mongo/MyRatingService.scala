@@ -3,14 +3,12 @@ package services.mongo
 import javax.inject.Singleton
 
 import models.MyRating
-
 import play.api.Play.current
+import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.json.{JsObject, Json}
 import play.modules.reactivemongo.ReactiveMongoApi
 import play.modules.reactivemongo.json._
 import play.modules.reactivemongo.json.collection._
-import play.api.libs.concurrent.Execution.Implicits.defaultContext
-
 import reactivemongo.api
 import reactivemongo.api.DB
 import reactivemongo.api.commands.UpdateWriteResult
@@ -37,8 +35,13 @@ class MyRatingMongoService() extends MongoCRUDService[MyRating, BSONObjectID] wi
   }
 
   def getRateByUserAndBookIds(userId:Int, bookId:Int):Future[Option[MyRating]]={
-    val selector = Json.obj("users_id" -> userId, "books_id" -> bookId)
-    collection.find(selector).one[MyRating]
+    if(userId > -1){
+      val selector = Json.obj("users_id" -> userId, "books_id" -> bookId)
+      collection.find(selector).one[MyRating]
+    }
+    else{
+      Future.successful(None)
+    }
   }
 
   def updateRating(selector:JsObject, newRate:Double):Future[UpdateWriteResult]={

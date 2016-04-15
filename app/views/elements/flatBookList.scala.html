@@ -1,10 +1,10 @@
-@(listName:String, bookListOption:Option[List[Book]])
+@(listName : String, bookList : List[Book])
 
 <div class="products">
     <h3>@listName</h3>
     <ul>
-        @if(bookListOption.isDefined && bookListOption.get.nonEmpty) {
-            @for(book <- bookListOption.get) {
+        @if(bookList.nonEmpty) {
+            @for(book <- bookList) {
                 <li>
                     <div class="product">
                         <a href="/book/@book._id" class="info">

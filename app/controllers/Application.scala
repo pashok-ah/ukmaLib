@@ -31,21 +31,27 @@ import scala.concurrent.Future
 
 
 class Application @Inject()(override implicit val env: MyEnvironment,
-                            bookInfoProvider : BookInfoProvider)
+                            bookInfoProvider: BookInfoProvider)
   extends securesocial.core.SecureSocial {
 
   def index = Action.async { implicit request =>
     var userName = "Guest"
-    var userAvatarUrlOption : Option[String]= None
-    SecureSocial.currentUser.map { maybeUser =>
-      if(maybeUser.isDefined && maybeUser.get.isInstanceOf[User]) {
+    var userAvatarUrlOption: Option[String] = None
+
+    val httpResponse = for {
+      sliderBooks <- bookInfoProvider.getMainSliderBooks()
+      indexFlatList <- bookInfoProvider.popularBooksForIndexFlatList()
+      maybeUser <- SecureSocial.currentUser
+    } yield {
+      if (maybeUser.isDefined && maybeUser.get.isInstanceOf[User]) {
         val user = maybeUser.get.asInstanceOf[User]
         userName = user.main.fullName.get
         userAvatarUrlOption = user.main.avatarUrl
       }
-      Ok(views.html.index(userName, userAvatarUrlOption,bookInfoProvider.getMainSliderBooks(),
-        bookInfoProvider.popularBooksForIndexFlatList)(implicitly[Messages], implicitly[MyEnvironment]))
+      Ok(views.html.index(userName, userAvatarUrlOption, sliderBooks,
+        indexFlatList)(implicitly[Messages], implicitly[MyEnvironment]))
     }
+    httpResponse
   }
 
   def profileInfo = SecuredAction.async { implicit request =>
@@ -53,9 +59,11 @@ class Application @Inject()(override implicit val env: MyEnvironment,
   }
 
   def recommendations = SecuredAction.async { implicit request =>
-    Future(Ok(views.html.recommendations(request.user.main.fullName.get, request.user.main.avatarUrl,
-      bookInfoProvider.getBookEntitiesByIdArray(request.user.personalRecommendations))(implicitly[Messages],
-      implicitly[MyEnvironment])))
+    bookInfoProvider.getBookEntitiesByIdArray(request.user.personalRecommendations).map(
+      recommendations => Ok(views.html.recommendations(request.user.main.fullName.get,
+        request.user.main.avatarUrl, recommendations)(implicitly[Messages],
+        implicitly[MyEnvironment]))
+    )
   }
 
   // a sample action using an authorization implementation
@@ -66,6 +74,7 @@ class Application @Inject()(override implicit val env: MyEnvironment,
   def testFromMongoToRddImport = Action {
     Ok("Imported!!!")
   }
+
   /**
     * Sample use of SecureSocial.currentUser. Access the /current-user to test it
     */

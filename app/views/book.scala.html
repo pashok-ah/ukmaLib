@@ -1,9 +1,10 @@
-@(book: Book, similarBooksBySybjectsListOption: Option[List[Book]],youMayAlsoLikeBookListOption: Option[List[Book]],
+@(book: Book, similarBooksBySybjectsListOption: List[Book],youMayAlsoLikeBookListOption: List[Book],
         rateOption: Option[MyRating], userName: String, userAvatarOption: Option[String])
 
     @import play.api.Play.current
     @import play.api.i18n.Messages.Implicits._
-@main(book.bookTitle, userName, userAvatarOption, false, None) {
+@main(book.bookTitle, userName, userAvatarOption) {
+    <div id="main" class="shell">
     <!-- Sidebar -->
 
     <!-- End Sidebar -->
@@ -73,11 +74,11 @@
         <div class="cl">&nbsp;</div>
     @views.html.elements.sidebar()
     <div id="similar-books-lists">
-        @if(similarBooksBySybjectsListOption.isDefined){
-            @views.html.elements.bookList("Similar books by subjects",similarBooksBySybjectsListOption.get)
+        @if(similarBooksBySybjectsListOption.nonEmpty){
+            @views.html.elements.bookList("Similar books by subjects",similarBooksBySybjectsListOption)
         }
-        @if(youMayAlsoLikeBookListOption.isDefined){
-            @views.html.elements.bookList("If you like this, you may also like",youMayAlsoLikeBookListOption.get)
+        @if(youMayAlsoLikeBookListOption.nonEmpty){
+            @views.html.elements.bookList("If you like this, you may also like",youMayAlsoLikeBookListOption)
         }
     </div>
         <!-- End Content -->
@@ -85,6 +86,6 @@
 
         <!-- End Best-sellers -->
     </div>
-
+</div>
 
 }
