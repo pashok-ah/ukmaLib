@@ -15,8 +15,8 @@ import services.infoproviders.BookInfoProvider
 import services.mongo._
 import services.secsocial.MyEnvironment
 
-import scala.concurrent.Await
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 /**
   * Created by P. Akhmedzianov on 05.04.2016.
@@ -27,10 +27,12 @@ class BookPageController @Inject()(override implicit val env: MyEnvironment,
                                    bookInfoProvider: BookInfoProvider)
   extends securesocial.core.SecureSocial {
   val additionalInfoLoader_ = new AdditionalBooksInfoLoaderGoogleAPI()
-  val testSimilarBooksList = Array(-1,1,2,3,4,5)
+  val awaitDuration_ = 5 seconds
 
-  def isRateInBorders(rate:Double):Boolean = rate>0 && rate <=10
-  def isUser (maybeUser:Option[BookPageController.this.env.U]) = {
+
+  def isRateInBorders(rate: Double): Boolean = rate > 0 && rate <= 10
+
+  def isUser(maybeUser: Option[BookPageController.this.env.U]) = {
     maybeUser.isDefined && maybeUser.get.isInstanceOf[User]
   }
 
@@ -40,7 +42,7 @@ class BookPageController @Inject()(override implicit val env: MyEnvironment,
     var rateOption: Option[MyRating] = None
 
     val bookFuture = booksMongoService.getBookById(bookId)
-    val bookOption = Await.ready(bookFuture, Duration.Inf).value.get
+    val bookOption = Await.ready(bookFuture, awaitDuration_).value.get
 
     SecureSocial.currentUser.map { maybeUser =>
       if (isUser(maybeUser)) {
@@ -50,7 +52,7 @@ class BookPageController @Inject()(override implicit val env: MyEnvironment,
         // finding rate for this user in database
         if (bookOption.get.isDefined) {
           val rateFuture = myRatingsMongoService.getRateByUserAndBookIds(user.userIntId.get, bookId)
-          val rateOptionFromMongo = Await.ready(rateFuture, Duration.Inf).value.get
+          val rateOptionFromMongo = Await.ready(rateFuture, awaitDuration_).value.get
           rateOption = rateOptionFromMongo.getOrElse(None)
         }
       }
@@ -71,57 +73,54 @@ class BookPageController @Inject()(override implicit val env: MyEnvironment,
     }
   }
 
-  def saveTheRateAjaxCall(bookId: Int, rate: Double, isAjaxCall:Boolean) = SecuredAction { implicit request =>
-    if(isRateInBorders(rate) && isAjaxCall) {
-      myRatingsMongoService.create(new MyRating(None,
+  def saveTheRateAjaxCall(bookId: Int, rate: Double) = SecuredAction { implicit request =>
+    if (isRateInBorders(rate)) {
+      val createResultFuture = myRatingsMongoService.create(new MyRating(None,
         request.user.userIntId.get, bookId, rate))
-      Ok("Success")
-    }
-    else{
-      NotFound
-    }
-  }
-
-  def updateTheNewRateAjaxCall(bookId: Int, rate: Double, isAjaxCall:Boolean) = SecuredAction { implicit request =>
-      if (isRateInBorders(rate) && isAjaxCall ) {
-        myRatingsMongoService.updateExistingRating(request.user.userIntId.get, bookId, rate)
-        Ok("Success")
-      }
-      else {
-        NotFound
-      }
-  }
-
-  def updateTheRateAjaxCall(myRatingId: String, rate: Double, isAjaxCall:Boolean) = SecuredAction { implicit request =>
-    val bsonMyRatingIdTry = BSONObjectID.parse(myRatingId)
-    if (bsonMyRatingIdTry.isSuccess && isRateInBorders(rate) && isAjaxCall) {
-      myRatingsMongoService.updateExistingRating(bsonMyRatingIdTry.get, rate)
-      Ok("Success")
+      val resultMessage = awaitAndReturnBookId(createResultFuture)
+      Ok(resultMessage)
     }
     else {
-      NotFound
+      Ok("Error")
     }
   }
 
-  def deleteTheRateAjaxCall(myRatingId: String, isAjaxCall:Boolean) = SecuredAction { implicit request =>
+  def updateTheRateAjaxCall(myRatingId: String, rate: Double) = SecuredAction { implicit request =>
     val bsonMyRatingIdTry = BSONObjectID.parse(myRatingId)
-    if (bsonMyRatingIdTry.isSuccess && isAjaxCall) {
+    if (bsonMyRatingIdTry.isSuccess && isRateInBorders(rate)) {
+      val updateFuture = myRatingsMongoService.updateExistingRating(bsonMyRatingIdTry.get, rate)
+      val awaitResult = Await.ready(updateFuture, awaitDuration_).value.get
+      if(awaitResult.isSuccess && awaitResult.get.ok)
+        Ok("Success")
+      else
+        Ok("Error")
+    }
+    else {
+      Ok("Error")
+    }
+  }
+
+  def deleteTheRateAjaxCall(myRatingId: String) = SecuredAction { implicit request =>
+    val bsonMyRatingIdTry = BSONObjectID.parse(myRatingId)
+    if (bsonMyRatingIdTry.isSuccess) {
       myRatingsMongoService.delete(bsonMyRatingIdTry.get)
       Ok("Success")
     }
     else {
-      NotFound
+      Ok("Error")
     }
   }
 
-  def deleteTheNewRateAjaxCall(bookId: Int, isAjaxCall:Boolean) = SecuredAction { implicit request =>
-    if (isAjaxCall) {
-      myRatingsMongoService.removeRatingByUserAndBook(request.user.userIntId.get, bookId)
-      Ok("Success")
+  def awaitAndReturnBookId(future: Future[Either[String, BSONObjectID]]): String = {
+    var resultMessage = "Error"
+    val awaitResult = Await.ready(future, awaitDuration_).value.get
+    if (awaitResult.isSuccess) {
+      awaitResult.get match {
+        case Right(res) => resultMessage = res.stringify
+        case _ =>
+      }
     }
-    else {
-      NotFound
-    }
+    resultMessage
   }
 
   def javascriptRoutes = Action { implicit request =>
@@ -129,9 +128,7 @@ class BookPageController @Inject()(override implicit val env: MyEnvironment,
       JavaScriptReverseRouter("jsRoutes", Some("myAjaxFunction"))(
         routes.javascript.BookPageController.saveTheRateAjaxCall,
         routes.javascript.BookPageController.updateTheRateAjaxCall,
-        routes.javascript.BookPageController.updateTheNewRateAjaxCall,
-        routes.javascript.BookPageController.deleteTheRateAjaxCall,
-        routes.javascript.BookPageController.deleteTheNewRateAjaxCall
+        routes.javascript.BookPageController.deleteTheRateAjaxCall
       )
     ).as("text/javascript")
   }

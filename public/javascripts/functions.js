@@ -1,16 +1,16 @@
 $(function() {
 
     $( document ).ready(function() {
+
         if($( "#my-rating").data('rating') == '0'){
             $("#delete-rate-button").hide();
         }
+
         $("#book-big-description-truncate").dotdotdot({
             after: 'a.more',
             callback: dotdotdotCallback
         });
-
         $("#book-big-description-truncate").on('click', 'a', function () {
-
             if ($(this).text() == "More") {
                 var div = $(this).closest('#book-big-description-truncate');
                 div.trigger('destroy').find('a.more').hide();
@@ -18,7 +18,6 @@ $(function() {
                 div.css('height', 'auto');
                 $("a.less", div).show();
             } else {
-
                 $(this).closest('#book-big-description-truncate').css("max-height", "50px").dotdotdot({
                     after: "a",
                     callback: dotdotdotCallback
@@ -74,6 +73,21 @@ $(function() {
         wrap: 'both'
     });
 
+    $("#global-rating").starRating({
+        totalStars: 10,
+        starSize: 18,
+        strokeWidth: 2,
+        strokeColor: 'black',
+        emptyColor: 'lightgray',
+        hoverColor: 'orange',
+        activeColor: 'gold',
+        useGradient: true,
+        readOnly:true,
+        starGradient: {
+            start: '#000926',
+            end: '#004D91'
+        }});
+
     var defaultForMyRating = {
         totalStars: 10,
         starSize: 32,
@@ -92,69 +106,60 @@ $(function() {
         callback: function(currentRating, $el) {
             var bookId = $el.data('book-id');
             var myRatingId = $el.data('myrating-objectid');
-            var ajaxUrl = jsRoutes.controllers.BookPageController.saveTheRateAjaxCall(bookId, currentRating, true);
+            var ajaxUrl = jsRoutes.controllers.BookPageController.saveTheRateAjaxCall(bookId, currentRating);
             if(myRatingId != '0'){
-                ajaxUrl = jsRoutes.controllers.BookPageController.updateTheRateAjaxCall(myRatingId, currentRating, true);
+                ajaxUrl = jsRoutes.controllers.BookPageController.updateTheRateAjaxCall(myRatingId, currentRating);
             }
-            else if($el.data('rating')!='0'){
-                ajaxUrl = jsRoutes.controllers.BookPageController.updateTheNewRateAjaxCall(bookId, currentRating, true);
-            }
-            else{
-                $el.data('rating',currentRating);
-                $el.attr('data-rating',currentRating);
-            }
-            $.ajax({url: ajaxUrl.url, type: ajaxUrl.type, success: onSuccessUpdate(currentRating), error: "Save rate failure" });
+            $.ajax({url: ajaxUrl.url, type: ajaxUrl.type,
+                    datatype: "text",
+                    success: function(response){
+                        switch (response) {
+                            case 'Error':
+                                $("#user-rate-info").text("Error occured!");
+                                break;
+                            case 'Success':
+                                onSuccessUpdate(currentRating);
+                                break;
+                            default:
+                                $( "#my-rating").data('myrating-objectid',response);
+                                $( "#my-rating").attr('data-myrating-objectid',response);
+                                onSuccessUpdate(currentRating);
+                                break;
+                        }
+                    },
+                    error: onErrorUpdate});
             console.log('DOM element ', $el);
         }
     };
 
     var myStarRating = $("#my-rating").starRating(defaultForMyRating);
 
-    $("#global-rating").starRating({
-        totalStars: 10,
-        starSize: 18,
-        strokeWidth: 2,
-        strokeColor: 'black',
-        emptyColor: 'lightgray',
-        hoverColor: 'orange',
-        activeColor: 'gold',
-        useGradient: true,
-        readOnly:true,
-        starGradient: {
-            start: '#000926',
-            end: '#004D91'
-        }});
+
 
     $( "#delete-rate-button" ).click(function() {
         var ratingToDelete = $( "#my-rating").data('myrating-objectid');
-        var bookId = $( "#my-rating").data('book-id');
-
-        var ajaxUrl = jsRoutes.controllers.BookPageController.deleteTheRateAjaxCall(ratingToDelete, true);
-        if(ratingToDelete == "0"){
-            ajaxUrl = jsRoutes.controllers.BookPageController.deleteTheNewRateAjaxCall(bookId, true);
-        }
-        $.ajax({url: ajaxUrl.url, type: ajaxUrl.type, success: onSuccessDelete()});
+        var ajaxUrl = jsRoutes.controllers.BookPageController.deleteTheRateAjaxCall(ratingToDelete);
+        $.ajax({url: ajaxUrl.url, type: ajaxUrl.type, success: onSuccessDelete});
     });
 
     var onSuccessUpdate = function(rate) {
-        $("#user-rate-info").text("Your rate: " + rate);
+        $("#user-rate-info").text('Your rate: ' + rate);
         $("#delete-rate-button").show();
     };
 
-    var  onSuccessDelete = function() {
+    var onErrorUpdate = function(){
+        $("#user-rate-info").text('Error occured!');
+    }
 
+    var  onSuccessDelete = function() {
         $("#my-rating").data('plugin_starRating').applyRating(0);
-        $( "#my-rating").data('rating','0');
-        $( "#my-rating").attr('data-rating',0);
         $( "#my-rating").data('myrating-objectid','0');
         $( "#my-rating").attr('data-myrating-objectid',0);
         $("#user-rate-info").text("Rate this book:");
         $("#delete-rate-button").hide();
     };
 
-/*    $('.truncate-description').succinct({
-        size: 95
-    });*/
+
 
 /*     if ($.browser.msie && $.browser.version.substr(0,1)<7) {
         DD_belatedPNG.fix('#logo h1 a, .read-more-btn, #slider .image img, #book-list .jcarousel-prev, #best-sellers .jcarousel-next, #slider .jcarousel-container, #best-sellers .price, .shell, #footer, .products ul li a:hover');

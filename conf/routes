@@ -6,13 +6,10 @@
 GET        /                                  @controllers.Application.index
 GET        /recommendations                   @controllers.Application.recommendations
 GET        /book/:bookId                      @controllers.BookPageController.getBook(bookId:Int)
-PUT        /book/:bookId/:rate                @controllers.BookPageController.saveTheRateAjaxCall(bookId:Int, rate:Double, isAjaxCall :Boolean ?= false)
 
-POST       /rating/:id/:rate                  @controllers.BookPageController.updateTheRateAjaxCall(id:String, rate:Double, isAjaxCall :Boolean ?= false)
-POST       /user/:bookid/:rate                @controllers.BookPageController.updateTheNewRateAjaxCall(bookid:Int, rate:Double, isAjaxCall :Boolean ?= false)
-
-DELETE     /rating/deletebyid/:id             @controllers.BookPageController.deleteTheRateAjaxCall(id:String, isAjaxCall :Boolean ?= false)
-DELETE     /rating/deletebybookid/:bookid     @controllers.BookPageController.deleteTheNewRateAjaxCall(bookid:Int, isAjaxCall :Boolean ?= false)
+PUT        /book/:bookId/:rate                @controllers.BookPageController.saveTheRateAjaxCall(bookId:Int, rate:Double)
+POST       /rating/:id/:rate                  @controllers.BookPageController.updateTheRateAjaxCall(id:String, rate:Double)
+DELETE     /rating/deletebyid/:id             @controllers.BookPageController.deleteTheRateAjaxCall(id:String)
 
 GET        /profile                           @controllers.Application.profileInfo
 

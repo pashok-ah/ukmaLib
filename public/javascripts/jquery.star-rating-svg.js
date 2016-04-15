@@ -86,7 +86,7 @@
 
             // paint selected and remove hovered color
             this.paintStars(index, 'active');
-            this.executeCallback( rating, this.$el );
+            if(rating != 0) this.executeCallback( rating, this.$el );
             this._state.rating = rating;
 
 	    if(this.settings.disableAfterRate){
