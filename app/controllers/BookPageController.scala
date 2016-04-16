@@ -43,9 +43,9 @@ class BookPageController @Inject()(override implicit val env: MyEnvironment,
 
     val httpResponse = for {
       bookOption <- booksMongoService.getBookById(bookId)
+      maybeUserOption <- SecureSocial.currentUser
       similarBooksList <- bookInfoProvider.getSimilarBooks(bookOption)
       youMayAlsoLikeBooksList <- bookInfoProvider.getYouMayAlsoLikeBooks(bookOption)
-      maybeUserOption <- SecureSocial.currentUser
       rateOption <- myRatingsMongoService.getRateByUserAndBookIds(isUserGetId(maybeUserOption),
         bookId)
     } yield {

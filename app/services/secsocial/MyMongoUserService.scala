@@ -1,9 +1,7 @@
 package services.secsocial
 
-import javax.inject.Inject
-
 import models.JsonFormats.mailTokenFormat
-import models.{JsonFormats, User}
+import models.User
 import org.joda.time.DateTime
 import play.api.Play.current
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
@@ -15,8 +13,8 @@ import securesocial.core.providers.MailToken
 import securesocial.core.services.{SaveMode, UserService}
 import securesocial.core.{BasicProfile, PasswordInfo}
 import services.mongo.UsersMongoService
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future}
+
+import scala.concurrent.Future
 /**
   * Created by P. Akhmedzianov on 05.02.2016.
   */
@@ -39,33 +37,32 @@ class MyMongoUserService extends UserService[User] {
     }
   }
 
-  def save(basicProfile: BasicProfile, mode: SaveMode): Future[User] = {
-    mode match {
-      case SaveMode.SignUp =>
-        Future(createNewUser(basicProfile))
-      case SaveMode.LoggedIn =>
-        usersMongoService.findByCriteria(Map("providerid" -> basicProfile.providerId,
-          "email" -> basicProfile.email.get), 1).map {
-          case t if t.nonEmpty => t.head
-          case _ => createNewUser(basicProfile)
-        }
-      case SaveMode.PasswordChange =>
-        usersMongoService.findByCriteria(Map("providerid" -> basicProfile.providerId,
-          "email" -> basicProfile.email.get), 1).map {
-          case t if t.nonEmpty => Await.ready(updateProfile(t.head, basicProfile), Duration.Inf).value.get.get
-          case _ => createNewUser(basicProfile)
-        }
-    }
+  def save(basicProfile: BasicProfile, mode: SaveMode): Future[User] = mode match {
+    case SaveMode.SignUp =>
+      createNewUser(basicProfile)
+    case SaveMode.LoggedIn =>
+      val userFuture = usersMongoService.findByCriteria(Map("providerid" -> basicProfile.providerId,
+        "email" -> basicProfile.email.get), 1)
+        userFuture.flatMap {
+        case t if t.nonEmpty => Future.successful(t.head)
+        case _ => createNewUser(basicProfile)
+      }
+    case SaveMode.PasswordChange =>
+      val userFuture = usersMongoService.findByCriteria(Map("providerid" -> basicProfile.providerId,
+        "email" -> basicProfile.email.get), 1)
+      userFuture.flatMap {
+        case t if t.nonEmpty => updateProfile(t.head, basicProfile)
+        case _ => createNewUser(basicProfile)
+      }
   }
 
-  private def createNewUser(basicProfile: BasicProfile): User = {
+  private def createNewUser(basicProfile: BasicProfile): Future[User] = {
     val newUser = new User(basicProfile, None, None, None, List())
     val futureRes = usersMongoService.create(newUser)
-    Await.ready(futureRes, Duration.Inf).value.get.get match {
-      case Left(mes) => {
+    futureRes.map{
+      case Left(mes) =>
         throw new Exception("Creation of new user failed! "+mes)
         null
-      }
       case Right(id) => newUser.copy(userIntId = Some(id))
     }
   }
