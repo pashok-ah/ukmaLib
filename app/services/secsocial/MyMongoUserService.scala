@@ -60,9 +60,7 @@ class MyMongoUserService extends UserService[User] {
     val newUser = new User(basicProfile, None, None, None, List())
     val futureRes = usersMongoService.create(newUser)
     futureRes.map{
-      case Left(mes) =>
-        throw new Exception("Creation of new user failed! "+mes)
-        null
+      case Left(mes) => throw new Exception("Creation of new user failed! "+mes)
       case Right(id) => newUser.copy(userIntId = Some(id))
     }
   }
@@ -101,7 +99,7 @@ class MyMongoUserService extends UserService[User] {
   def deleteToken(uuid: String): Future[Option[MailToken]] = {
     val selector = Json.obj("uuid" -> uuid)
     val res = tokens.find(selector).one[MailToken]
-    tokens.remove(selector)
+    tokens().remove(selector)
     res
   }
 

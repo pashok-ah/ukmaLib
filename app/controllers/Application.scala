@@ -38,10 +38,14 @@ class Application @Inject()(override implicit val env: MyEnvironment,
     var userName = "Guest"
     var userAvatarUrlOption: Option[String] = None
 
-    val httpResponse = for {
-      sliderBooks <- bookInfoProvider.getMainSliderBooks()
-      indexFlatList <- bookInfoProvider.popularBooksForIndexFlatList()
-      maybeUser <- SecureSocial.currentUser
+    val sliderBooksFuture = bookInfoProvider.getMainSliderBooks()
+    val indexFlatListFuture = bookInfoProvider.popularBooksForIndexFlatList()
+    val currentUserFuture = SecureSocial.currentUser
+
+    for {
+      sliderBooks <- sliderBooksFuture
+      indexFlatList <- indexFlatListFuture
+      maybeUser <- currentUserFuture
     } yield {
       if (maybeUser.isDefined && maybeUser.get.isInstanceOf[User]) {
         val user = maybeUser.get.asInstanceOf[User]
@@ -51,7 +55,6 @@ class Application @Inject()(override implicit val env: MyEnvironment,
       Ok(views.html.index(userName, userAvatarUrlOption, sliderBooks,
         indexFlatList)(implicitly[Messages], implicitly[MyEnvironment]))
     }
-    httpResponse
   }
 
   def profileInfo = SecuredAction.async { implicit request =>
@@ -69,10 +72,6 @@ class Application @Inject()(override implicit val env: MyEnvironment,
   // a sample action using an authorization implementation
   def onlyTwitter = SecuredAction(WithProvider("facebook")) { implicit request =>
     Ok("You can see this because you logged in using Twitter")
-  }
-
-  def testFromMongoToRddImport = Action {
-    Ok("Imported!!!")
   }
 
   /**

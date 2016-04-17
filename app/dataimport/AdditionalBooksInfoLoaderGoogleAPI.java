@@ -26,7 +26,7 @@ public class AdditionalBooksInfoLoaderGoogleAPI {
     private static final String CSVFILE_STRING_DELIMITER = ";";
 
     private Books books;
-private int counter = 0;
+    private int counter = 0;
 
     public AdditionalBooksInfoLoaderGoogleAPI(){
         // Set up Books client.
@@ -42,7 +42,6 @@ private int counter = 0;
         } catch (IOException e) {
             e.printStackTrace();
         }
-
     }
 
 

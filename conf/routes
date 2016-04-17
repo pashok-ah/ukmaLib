@@ -25,8 +25,6 @@ GET        /import/users        @controllers.ImportController.importUsers
 GET        /import/books        @controllers.ImportController.importBooks
 GET        /import/ratings      @controllers.ImportController.importRatings
 
-GET        /testMongoImport     @controllers.Application.testFromMongoToRddImport
-
 # Map static resources from the /public folder to the /assets URL path
 GET        /assets/*file        controllers.Assets.at(path="/public", file)
 ->         /auth                securesocial.Routes

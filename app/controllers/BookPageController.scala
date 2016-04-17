@@ -41,9 +41,12 @@ class BookPageController @Inject()(override implicit val env: MyEnvironment,
     var userAvatarUrlOption: Option[String] = None
     var rateResultOption: Option[MyRating] = None
 
-    val httpResponse = for {
-      bookOption <- booksMongoService.getBookById(bookId)
-      maybeUserOption <- SecureSocial.currentUser
+    val bookOptionFuture = booksMongoService.getBookById(bookId)
+    val mayBeUserOptionFuture = SecureSocial.currentUser
+
+    for {
+      bookOption <- bookOptionFuture
+      maybeUserOption <- mayBeUserOptionFuture
       similarBooksList <- bookInfoProvider.getSimilarBooks(bookOption)
       youMayAlsoLikeBooksList <- bookInfoProvider.getYouMayAlsoLikeBooks(bookOption)
       rateOption <- myRatingsMongoService.getRateByUserAndBookIds(isUserGetId(maybeUserOption),
@@ -68,7 +71,6 @@ class BookPageController @Inject()(override implicit val env: MyEnvironment,
         NotFound(views.html.errors.error("Book not found", request.uri, userName, userAvatarUrlOption))
       }
     }
-    httpResponse
   }
 
   def saveTheRateAjaxCall(bookId: Int, rate: Double) = SecuredAction.async { implicit request =>
