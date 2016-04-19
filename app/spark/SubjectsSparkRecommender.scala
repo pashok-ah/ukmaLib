@@ -13,10 +13,7 @@ import org.bson.BSONObject
   */
 @Singleton
 class SubjectsSparkRecommender @Inject()(val configuration: play.api.Configuration)
-  extends SparkRatingsFromMongoHandler with java.io.Serializable {
-
-  val booksCollectionName_ = configuration.getString("mongodb.booksCollectionName").
-    getOrElse(BOOKS_DEFAULT_COLLECTION_NAME)
+  extends SparkMongoHandler(configuration) with java.io.Serializable {
 
   val numOfSimilarBooksToFind_ = configuration.getInt(
     "subjectsSparkRecommender.numberOfBooksToStore").getOrElse(5)

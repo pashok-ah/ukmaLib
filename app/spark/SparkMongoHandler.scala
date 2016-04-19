@@ -1,6 +1,5 @@
 package spark
 
-
 import com.mongodb.BasicDBObject
 import com.mongodb.hadoop.io.MongoUpdateWritable
 import com.mongodb.hadoop.{MongoInputFormat, MongoOutputFormat}
@@ -11,15 +10,17 @@ import org.bson.BSONObject
 /**
   * Created by P. Akhmedzianov on 03.03.2016.
   */
-trait SparkRatingsFromMongoHandler {
-  val MIN_NUMBER_OF_RATES_FOR_USER = 11
-  val MIN_NUMBER_OF_RATES_FOR_BOOK = 11
+abstract class SparkMongoHandler(configuration: play.api.Configuration)
+extends java.io.Serializable{
+  val ratingsCollectionName_ = configuration.getString("mongodb.ratingsCollectionName")
+    .getOrElse("ratings")
+  val usersCollectionName_ = configuration.getString("mongodb.usersCollectionName")
+    .getOrElse("users")
+  val booksCollectionName_ = configuration.getString("mongodb.booksCollectionName")
+    .getOrElse("booksShortened")
 
-  val RATINGS_DEFAULT_COLLECTION_NAME = "ratings"
-  val BOOKS_DEFAULT_COLLECTION_NAME = "booksShortened"
-  val USERS_DEFAULT_COLLECTION_NAME = "users"
-
-  val defaultMongoDbUri = "mongodb://localhost:27017/BookRecommenderDB"
+  val mongoDbUri_ = configuration.getString("mongodb.uri")
+    .getOrElse("mongodb://localhost:27017/BookRecommenderDB")
 
   def transformToRatingRdd(inputRdd:RDD[(Int, (Int, Double))]):RDD[Rating]={
     inputRdd.map(inputLine => new Rating(inputLine._1, inputLine._2._1, inputLine._2._2))
@@ -32,8 +33,7 @@ trait SparkRatingsFromMongoHandler {
   def getCollectionFromMongoRdd(inputCollectionName: String):
   RDD[(Object, BSONObject)] = {
     val mongoConfiguration = new Configuration()
-    mongoConfiguration.set("mongo.input.uri",
-      play.Play.application.configuration.getString("mongodb.uri") + "." + inputCollectionName)
+    mongoConfiguration.set("mongo.input.uri", mongoDbUri_ + "." + inputCollectionName)
     // Create an RDD backed by the MongoDB collection.
     val fromMongoRdd = SparkCommons.sc.newAPIHadoopRDD(
       mongoConfiguration, // Configuration
@@ -47,9 +47,7 @@ trait SparkRatingsFromMongoHandler {
   def updateMongoCollectionWithRdd(updateCollectionName:String,
                                    toMongoUpdateRdd:RDD[(Object, MongoUpdateWritable)]): Unit ={
     val outputConfig = new Configuration()
-    outputConfig.set("mongo.output.uri",
-      play.Play.application.configuration.getString("mongodb.uri") + "." +
-        updateCollectionName)
+    outputConfig.set("mongo.output.uri", mongoDbUri_ + "." + updateCollectionName)
     toMongoUpdateRdd.saveAsNewAPIHadoopFile(
       "file:///this-is-completely-unused",
       classOf[Object],
@@ -79,9 +77,4 @@ trait SparkRatingsFromMongoHandler {
 }
 
 
-trait PersonalizedRecommender{
-    def predict(user: Int, product: Int): Double
 
-    def recommendProducts(user: Int, num: Int): Map[Int, Double]
-
-}

@@ -3,16 +3,16 @@ package services.scheduler
 import javax.inject.{Inject, Singleton}
 
 import akka.actor.Actor
-import spark.{BookGlobalRatingsUpdater, ContentBasedSparkRatingsRecommender, MlLibAlsSparkRatingsFromMongoHandler, SubjectsSparkRecommender}
+import spark._
 
 /**
   * Created by P. Akhmedzianov on 09.04.2016.
   */
 @Singleton
 class SchedulerActor @Inject() (bookUpdater : BookGlobalRatingsUpdater,
-                                mlLibAlsSparkRatingsFromMongoHandler: MlLibAlsSparkRatingsFromMongoHandler,
+                                mlLibAlsSparkRatingsFromMongoHandler: MlLibAlsSparkRatingsRecommender,
                                 contentBasedSparkRatingsRecommender: ContentBasedSparkRatingsRecommender,
-                                subjectsSparkRecommender: SubjectsSparkRecommender)
+                                hybrid: HybridNearestNeighboursRecommender)
   extends Actor {
   def receive = {
     case "updateRatings" => updateRatingsInDb()
@@ -39,7 +39,7 @@ class SchedulerActor @Inject() (bookUpdater : BookGlobalRatingsUpdater,
 
   def updateSimilarBooks(): Unit ={
     println("Updating similar books...")
-    subjectsSparkRecommender.updateSimilarBooks()
+    hybrid.test()
   }
 
 

@@ -9,9 +9,10 @@ import org.apache.spark.serializer.KryoRegistrator
 class MyKryoRegistrator extends KryoRegistrator {
   override def registerClasses(kryo: Kryo) {
     kryo.register(classOf[SubjectsSparkRecommender])
-    kryo.register(classOf[MlLibAlsSparkRatingsFromMongoHandler])
+    kryo.register(classOf[MlLibAlsSparkRatingsRecommender])
     kryo.register(classOf[BookGlobalRatingsUpdater])
     kryo.register(classOf[ContentBasedSparkRatingsRecommender])
+    kryo.register(Class.forName("org.apache.spark.util.StatCounter"))
     kryo.register(Class.forName("scala.collection.immutable.$colon$colon"))
     kryo.register(Class.forName("scala.collection.immutable.Nil$"))
     kryo.register(Class.forName("org.apache.spark.ml.recommendation.ALS$RatingBlock"))
@@ -23,6 +24,7 @@ class MyKryoRegistrator extends KryoRegistrator {
     kryo.register(classOf[Array[Int]])
     kryo.register(classOf[Array[Float]])
     kryo.register(classOf[Array[Array[Float]]])
+    kryo.register(classOf[Array[Array[Int]]])
     kryo.register(classOf[Array[Double]])
   }
 }

@@ -7,15 +7,10 @@ import javax.inject.{Inject, Singleton}
   */
 @Singleton
 class ContentBasedSparkRatingsRecommender @Inject()(val configuration: play.api.Configuration)
-  extends SparkRatingsFromMongoHandler with java.io.Serializable {
-  val minNumRatesForUserToFilter = 10
+  extends SparkMongoHandler(configuration) with java.io.Serializable {
+
   val numOfSimilarBooksToFind_ = configuration.getInt(
     "contentBasedSparkRatingsRecommender.numberOfBooksToStore").getOrElse(5)
-
-  val booksCollectionName_ = configuration.getString("mongodb.booksCollectionName")
-    .getOrElse(BOOKS_DEFAULT_COLLECTION_NAME)
-  val ratingsCollectionName_ = configuration.getString("mongodb.ratingsCollectionName")
-    .getOrElse(RATINGS_DEFAULT_COLLECTION_NAME)
 
   def updateYouMayAlsoLikeBooks(): Unit = {
     //getting: bookid, List[(uesrid, rating, number of raters)]

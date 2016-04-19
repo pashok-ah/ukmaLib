@@ -4,7 +4,6 @@ import javax.inject.{Inject, Singleton}
 
 import com.mongodb.BasicDBObject
 import com.mongodb.hadoop.io.MongoUpdateWritable
-import org.apache.spark.rdd.RDD
 import play.api.Configuration
 
 
@@ -13,16 +12,12 @@ import play.api.Configuration
   */
 @Singleton
 class BookGlobalRatingsUpdater @Inject() (val configuration: Configuration)
-  extends SparkRatingsFromMongoHandler
+  extends SparkMongoHandler(configuration)
   with java.io.Serializable{
-  val RATING_PRECISION = 3
+  val DIGITS_AFTER_DOT = 3
 
-  val thresholdOfRatesToCalculateGlobalRating = 9
-
-  val booksCollectionName_ = configuration.getString("mongodb.booksCollectionName")
-    .getOrElse(BOOKS_DEFAULT_COLLECTION_NAME)
-  val ratingsCollectionName_ = configuration.getString("mongodb.ratingsCollectionName")
-    .getOrElse(RATINGS_DEFAULT_COLLECTION_NAME)
+  val minNumberOfRatesToCalculateGlobalRating_ = configuration.getInt(
+    "bookGlobalRatingsUpdater.minNumberOfRatesToCalculateGlobalRating").getOrElse(10)
 
   def setRateCountsAndGlobalRatings(): Unit = {
     val countsAndAverageRdd = getKeyValueRatings(getCollectionFromMongoRdd(ratingsCollectionName_))
@@ -32,7 +27,7 @@ class BookGlobalRatingsUpdater @Inject() (val configuration: Configuration)
           (numberOfRates1 + numberOfRates2, rateList1.++(rateList2))}
       .mapValues{case (countRates, listOfRates) =>
         (countRates,
-          if(listOfRates.length > thresholdOfRatesToCalculateGlobalRating)
+          if(listOfRates.length >= minNumberOfRatesToCalculateGlobalRating_)
           calculateGlobalRating(listOfRates)
           else None)
       }
@@ -42,15 +37,7 @@ class BookGlobalRatingsUpdater @Inject() (val configuration: Configuration)
       })
   }
 
-  def getBookIdNumberRatesAndAverageRdd(input: RDD[(Int, (Int, Double))]): RDD[(Int, (Int, Double))] = {
-    input.map {
-      case (userId, (bookId, rate)) => (bookId, rate)
-    }.groupByKey().map {
-      case (bookId, rates) => (bookId, iterableOfRatesToNumberAndAverageTuple(rates))
-    }
-  }
-
-  def getMongoUpdateWritableForBookRatingUpdate(tuple:(Int, (Int, Option[Double]))):
+  private def getMongoUpdateWritableForBookRatingUpdate(tuple:(Int, (Int, Option[Double]))):
   MongoUpdateWritable={
     val updateBasicDbObject = new BasicDBObject
     updateBasicDbObject.put( "numberOfRates" , int2Integer(tuple._2._1))
@@ -80,7 +67,7 @@ class BookGlobalRatingsUpdater @Inject() (val configuration: Configuration)
     }
   }
 
-  def roundDouble = (toBeRounded: Double) => BigDecimal(toBeRounded).setScale(RATING_PRECISION,
+  def roundDouble = (toBeRounded: Double) => BigDecimal(toBeRounded).setScale(DIGITS_AFTER_DOT,
     BigDecimal.RoundingMode.HALF_UP).toDouble
 
   def iterableOfRatesToNumberAndAverageTuple = (iterableOfRates: Iterable[Double]) => {

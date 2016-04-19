@@ -31,7 +31,7 @@ class Scheduler @Inject()(val system: ActorSystem, @Named("scheduler-actor") val
     schedulerActor, "updateRatings")
   system.scheduler.schedule( updateYouMayAlsoLikeBooksInitial, updateYouMayAlsoLikeBooksPeriod,
     schedulerActor, "updateYouMayAlsoLikeBooks")
-  system.scheduler.schedule( 30 days, 30 days,
+  system.scheduler.schedule( 10 days, 30 days,
     schedulerActor, "updateSimilarBooks")
 
   def configMilliseconds(key: String, default: FiniteDuration): FiniteDuration =

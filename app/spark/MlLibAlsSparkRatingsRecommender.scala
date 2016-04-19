@@ -9,26 +9,30 @@ import play.api.Configuration
   * Created by P. Akhmedzianov on 03.03.2016.
   */
 @Singleton
-class MlLibAlsSparkRatingsFromMongoHandler @Inject() (val configuration: Configuration)
-  extends SparkRatingsFromMongoHandler with java.io.Serializable{
+class MlLibAlsSparkRatingsRecommender @Inject()(val configuration: Configuration)
+  extends SparkMongoHandler(configuration) with java.io.Serializable{
 
   val configurationPath_ = configuration.getString(
-    "mlLibAlsSparkRatingsFromMongoHandler.configurationPath").getOrElse(
+    "mlLibAlsSparkRatingsRecommender.configurationPath").getOrElse(
     SparkAlsPropertiesLoader.defaultPath)
-  val ratingsCollectionName_ = configuration.getString("mongodb.ratingsCollectionName")
-    .getOrElse(RATINGS_DEFAULT_COLLECTION_NAME)
-  val usersCollectionName_ = configuration.getString("mongodb.usersCollectionName")
-    .getOrElse(USERS_DEFAULT_COLLECTION_NAME)
 
-  var alsConfigurationOption_ : Option[AlsConfiguration] = None
+  val numberOfRecommendedBooks_ = configuration.getInt(
+    "mlLibAlsSparkRatingsRecommender.numberOfRecommendedBooks").getOrElse(5)
 
-  var matrixFactorizationModelOption_ : Option[MatrixFactorizationModel] = None
+  val minNumberOfRatesToGetRecommendations_ = configuration.getInt(
+    "mlLibAlsSparkRatingsRecommender.minNumberOfRatesToGetRecommendations").getOrElse(10)
 
-  var trainRatingsRddOption_ : Option[RDD[Rating]] = None
-  var validationRatingsRddOption_ : Option[RDD[Rating]] = None
-  var testRatingsRddOption_ : Option[RDD[Rating]] = None
+  private var alsConfigurationOption_ : Option[AlsConfiguration] = None
+
+  private var matrixFactorizationModelOption_ : Option[MatrixFactorizationModel] = None
+
+  protected var trainRatingsRddOption_ : Option[RDD[Rating]] = None
+  protected var validationRatingsRddOption_ : Option[RDD[Rating]] = None
+  private var testRatingsRddOption_ : Option[RDD[Rating]] = None
 
   def test(): Unit = {
+    initialize (isTuningParameters = true, isInitializingValidationRdd = true,
+      isInitializingTestRdd = true)
     matrixFactorizationModelOption_ match {
       case Some(matrixModel) =>
         println("Train RMSE = " + getRmseForRdd(trainRatingsRddOption_.get))
@@ -38,15 +42,15 @@ class MlLibAlsSparkRatingsFromMongoHandler @Inject() (val configuration: Configu
     }
   }
 
-  def initialize(isTuningParameters: Boolean, isInitializingValidationRdd: Boolean,
-                 isInitializingTestRdd: Boolean, isFilteringInput:Boolean): Unit = {
+  protected def initialize(isTuningParameters: Boolean, isInitializingValidationRdd: Boolean,
+                 isInitializingTestRdd: Boolean): Unit = {
     if (isTuningParameters && !isInitializingValidationRdd){
       throw new IllegalArgumentException
     }
     else {
       alsConfigurationOption_ = Some(SparkAlsPropertiesLoader.loadFromDisk(configurationPath_))
       initializeRdds(filterInputByNumberOfKeyEntriesRdd(getKeyValueRatings(
-        getCollectionFromMongoRdd(ratingsCollectionName_)),10),
+        getCollectionFromMongoRdd(ratingsCollectionName_)),minNumberOfRatesToGetRecommendations_),
         isInitializingValidationRdd, isInitializingTestRdd)
       if (isTuningParameters) tuneHyperParametersWithGridSearch()
       initializeModelWithRdd(trainRatingsRddOption_.get)
@@ -54,10 +58,8 @@ class MlLibAlsSparkRatingsFromMongoHandler @Inject() (val configuration: Configu
   }
 
   def updateRecommendationsInMongo(isTuning : Boolean): Unit ={
-    initialize(isTuning, isTuning == true, isInitializingTestRdd = false,
-      isFilteringInput = true)
-    initializeModelWithAllData()
-    exportAllPredictionsToMongo(5)
+    initialize(isTuning, isTuning, isInitializingTestRdd = false)
+    exportAllPredictionsToMongo(numberOfRecommendedBooks_)
   }
 
   private def tuneHyperParametersWithGridSearch(): Unit = {
@@ -102,10 +104,7 @@ class MlLibAlsSparkRatingsFromMongoHandler @Inject() (val configuration: Configu
 
   private def initializeModelWithAllData(): Unit ={
     if(trainRatingsRddOption_.isDefined && alsConfigurationOption_.isDefined){
-      var unitedRdd = trainRatingsRddOption_.get
-      if(validationRatingsRddOption_.isDefined) unitedRdd = unitedRdd.union(validationRatingsRddOption_.get)
-      if(testRatingsRddOption_.isDefined) unitedRdd = unitedRdd.union(testRatingsRddOption_.get)
-      matrixFactorizationModelOption_ = Some(ALS.train(unitedRdd, alsConfigurationOption_.get.rank_,
+      matrixFactorizationModelOption_ = Some(ALS.train(getUnitedInputRdd(), alsConfigurationOption_.get.rank_,
         alsConfigurationOption_.get.numIterations_, alsConfigurationOption_.get.lambda_))
     }
     else{
@@ -113,10 +112,17 @@ class MlLibAlsSparkRatingsFromMongoHandler @Inject() (val configuration: Configu
     }
   }
 
+  protected  def getUnitedInputRdd():RDD[Rating]={
+    var unitedRdd = trainRatingsRddOption_.get
+    if(validationRatingsRddOption_.isDefined) unitedRdd = unitedRdd.union(validationRatingsRddOption_.get)
+    if(testRatingsRddOption_.isDefined) unitedRdd = unitedRdd.union(testRatingsRddOption_.get)
+    unitedRdd
+  }
 
 
-  private def initializeRdds(filteredInputRdd: RDD[(Int, (Int, Double))], isInitializingValidationRdd: Boolean,
-                     isInitializingTestRdd: Boolean): Unit = {
+  private def initializeRdds(filteredInputRdd: RDD[(Int, (Int, Double))],
+                             isInitializingValidationRdd: Boolean,
+                             isInitializingTestRdd: Boolean): Unit = {
     if ((isInitializingValidationRdd || isInitializingTestRdd) && alsConfigurationOption_.isDefined) {
       val gropedByKeyRdd = filteredInputRdd.groupByKey()
 
@@ -146,30 +152,35 @@ class MlLibAlsSparkRatingsFromMongoHandler @Inject() (val configuration: Configu
     else {
       trainRatingsRddOption_ = Some(transformToRatingRdd(filteredInputRdd))
     }
+    println("Train rdd size"+trainRatingsRddOption_.get.count())
   }
 
 
-  private def getRmseForRdd(ratings: RDD[Rating]): Double = {
+  protected def getRmseForRdd(ratings: RDD[Rating]): Double = {
     // Evaluate the model on rating data
-    if(matrixFactorizationModelOption_.isDefined) {
       val usersProducts = ratings.map { case Rating(user, product, rate) =>
         (user, product)
       }
       val predictions =
-        matrixFactorizationModelOption_.get.predict(usersProducts).map { case Rating(user, product, rate) =>
+        predict(usersProducts).map { case Rating(user, product, rate) =>
           ((user, product), rate)
         }
       val ratesAndPreds = ratings.map { case Rating(user, product, rate) =>
         ((user, product), rate)
       }.join(predictions)
       val meanSquaredError = ratesAndPreds.map { case ((user, product), (r1, r2)) =>
-        val err = (r1 - r2)
+        val err = r1 - r2
         err * err
       }.mean()
       Math.sqrt(meanSquaredError)
+  }
+
+  def predict(userProducts:RDD[(Int, Int)]):RDD[Rating]={
+    if(matrixFactorizationModelOption_.isDefined) {
+      matrixFactorizationModelOption_.get.predict(userProducts)
     }
     else{
-      throw new IllegalStateException()
+      throw  new IllegalStateException("Matrix factorization model is not defined!")
     }
   }
 
@@ -177,7 +188,7 @@ class MlLibAlsSparkRatingsFromMongoHandler @Inject() (val configuration: Configu
     if(matrixFactorizationModelOption_.isDefined) {
       // Evaluate the model on rating data
       val K = 10
-      val usersWithPositiveRatings = ratings.filter { case Rating(user, product, rate) => (rate > 5) }.map {
+      val usersWithPositiveRatings = ratings.filter { case Rating(user, product, rate) => rate > 5 }.map {
         case Rating(user, product, rate) =>
           (user, product)
       }.groupByKey()
@@ -191,7 +202,7 @@ class MlLibAlsSparkRatingsFromMongoHandler @Inject() (val configuration: Configu
         val trueBooksArray = trueBooks.toArray
         val minNumberOfTrueRatesAndK = Math.min(trueBooksArray.length, K)
         var precision = 0
-        for (k <- 0 to predictedBooks.length - 1) {
+        for (k <- predictedBooks.indices) {
           val addition = if (trueBooksArray.contains(predictedBooks(k))) k else 0
           precision += addition
         }
@@ -224,6 +235,10 @@ class MlLibAlsSparkRatingsFromMongoHandler @Inject() (val configuration: Configu
       groupedLine._2.size >= threshold
     }.flatMapValues(x => x)
     filteredRatingsRdd
+  }
+
+  protected def getUserFeaturesRdd():RDD[(Int, Array[Double])]={
+    matrixFactorizationModelOption_.get.userFeatures
   }
 
 

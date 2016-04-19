@@ -1,4 +1,4 @@
-import PlayKeys._
+
 
 name := "RecBook"
 
@@ -8,7 +8,7 @@ lazy val `recbook` = (project in file(".")).enablePlugins(PlayScala)
 
 scalaVersion := "2.11.7"
 
-val sparkVersion = "1.5.0"
+val sparkVersion = "1.6.1"
 
 libraryDependencies ++= Seq(
   jdbc,
