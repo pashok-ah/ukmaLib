@@ -9,10 +9,11 @@ import spark._
   * Created by P. Akhmedzianov on 09.04.2016.
   */
 @Singleton
-class SchedulerActor @Inject() (bookUpdater : BookGlobalRatingsUpdater,
-                                mlLibAlsSparkRatingsFromMongoHandler: MlLibAlsSparkRatingsRecommender,
-                                contentBasedSparkRatingsRecommender: ContentBasedSparkRatingsRecommender,
-                                hybrid: HybridNearestNeighboursRecommender)
+class SchedulerActor @Inject() (bookUpdater :  BookGlobalRatingsUpdater,
+                                mlLibAlsSparkRatingsFromMongoHandler:  MlLibAlsSparkRatingsRecommender,
+                                contentBasedSparkRatingsRecommender:  ContentBasedSparkRatingsRecommender,
+                                hybrid:  HybridNearestNeighboursRecommender,
+                                subjectsSparkRecommender: SubjectsSparkRecommender)
   extends Actor {
   def receive = {
     case "updateRatings" => updateRatingsInDb()
@@ -39,7 +40,7 @@ class SchedulerActor @Inject() (bookUpdater : BookGlobalRatingsUpdater,
 
   def updateSimilarBooks(): Unit ={
     println("Updating similar books...")
-    hybrid.test()
+    subjectsSparkRecommender.updateSimilarBooks()
   }
 
 

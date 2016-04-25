@@ -12,7 +12,14 @@ class MyKryoRegistrator extends KryoRegistrator {
     kryo.register(classOf[MlLibAlsSparkRatingsRecommender])
     kryo.register(classOf[BookGlobalRatingsUpdater])
     kryo.register(classOf[ContentBasedSparkRatingsRecommender])
+    kryo.register(Class.forName("scala.collection.immutable.ListSet$Node"))
+    kryo.register(Class.forName("scala.collection.immutable.ListSet$EmptyListSet$"))
+    kryo.register(Class.forName("scala.collection.immutable.HashSet$HashSetCollision1"))
+    kryo.register(Class.forName("org.apache.spark.mllib.recommendation.Rating"))
     kryo.register(Class.forName("org.apache.spark.util.StatCounter"))
+    kryo.register(Class.forName("com.clearspring.analytics.stream.cardinality.HyperLogLogPlus"))
+    kryo.register(Class.forName("com.clearspring.analytics.stream.cardinality.HyperLogLogPlus$Format"))
+    kryo.register(Class.forName("com.clearspring.analytics.stream.cardinality.RegisterSet"))
     kryo.register(Class.forName("scala.collection.immutable.$colon$colon"))
     kryo.register(Class.forName("scala.collection.immutable.Nil$"))
     kryo.register(Class.forName("org.apache.spark.ml.recommendation.ALS$RatingBlock"))
@@ -26,5 +33,6 @@ class MyKryoRegistrator extends KryoRegistrator {
     kryo.register(classOf[Array[Array[Float]]])
     kryo.register(classOf[Array[Array[Int]]])
     kryo.register(classOf[Array[Double]])
+    kryo.register(classOf[Array[org.apache.spark.mllib.recommendation.Rating]])
   }
 }

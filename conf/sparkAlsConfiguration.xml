@@ -2,7 +2,7 @@
       <rank>20</rank>
       <numIterations>30</numIterations>
       <lambda>1.0</lambda>
-      <trainingShare>0.55</trainingShare>
+      <trainingShare>0.6</trainingShare>
       <validationShare>0.5</validationShare>
       <ranks>
         <rankVariant>20</rankVariant><rankVariant>18</rankVariant>

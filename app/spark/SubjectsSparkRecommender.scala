@@ -7,6 +7,8 @@ import com.mongodb.BasicDBList
 import org.apache.spark.rdd.RDD
 import org.bson.BSONObject
 
+import scala.collection.mutable
+
 
 /**
   * Created by P. Akhmedzianov on 23.03.2016.
@@ -18,7 +20,7 @@ class SubjectsSparkRecommender @Inject()(val configuration: play.api.Configurati
   val numOfSimilarBooksToFind_ = configuration.getInt(
     "subjectsSparkRecommender.numberOfBooksToStore").getOrElse(5)
 
-  private def getIdAndSubjectsRdd(inputRdd: RDD[(Object, BSONObject)]):RDD[(Int, Array[String])]={
+  private def getIdAndSubjectsRdd(inputRdd: RDD[(Object, BSONObject)]): RDD[(Int, Array[String])] = {
     val res = inputRdd.map(arg => {
       val arrFeatures = arg._2.get("subjects").asInstanceOf[BasicDBList].toArray
       (arg._2.get("_id").asInstanceOf[Int], arrFeatures.map(_.toString))
@@ -35,29 +37,22 @@ class SubjectsSparkRecommender @Inject()(val configuration: play.api.Configurati
     val inputWithNumSubjectsRDD = inputRDD.map {
       case (bookId, featuresArray) => ((bookId, featuresArray.size), featuresArray)
     }
-    //get distinct features and number of books with this feature
-    val distinctFeaturesAndCountersRdd = calculateDistinctFeaturesCounts(inputRDD)
     //got featureName, (bookid, numFeaturesForBook, numBooksWithFeature)
     val joinedWithFeatureCountsRdd = inputWithNumSubjectsRDD.flatMapValues(x => x)
       .map {
         case ((bookId, numberOfFeatures), featureName) => (featureName, (bookId, numberOfFeatures))
       }
-      .join(distinctFeaturesAndCountersRdd)
-      .map {
-        case (featureName, ((bookId, numberOfFeatures), featureCollectionCount)) =>
-          (featureName, (bookId, numberOfFeatures, featureCollectionCount))
-      }
     //creating pairs with common features ((book1Id, book2Id),(numFeatures1Book, numFeatures2Book, numBoooksWithfeature)
     val bookPairsRDD = joinedWithFeatureCountsRdd.join(joinedWithFeatureCountsRdd)
       .filter(line => line._2._1._1 < line._2._2._1)
-      .map { case (featureName, ((bookId1, numberOfFeatures1, featureCollectionCount1),
-      (bookId2, numberOfFeatures2, featureCollectionCount2))) =>
-        ((bookId1, bookId2), (numberOfFeatures1, numberOfFeatures2, featureCollectionCount1))
+      .map { case (featureName, ((bookId1, numberOfFeatures1),
+      (bookId2, numberOfFeatures2))) =>
+        ((bookId1, bookId2), (1, numberOfFeatures1, numberOfFeatures2))
       }
     joinedWithFeatureCountsRdd.unpersist()
     // getting (book1Id,book2Id), Option[Correlation:Double]
-    val joinedBooksRDD = bookPairsRDD.mapValues(featureNumbers => List(featureNumbers))
-      .reduceByKey((left, right) => left.++(right))
+    val joinedBooksRDD = bookPairsRDD
+      .reduceByKey((left, right) => (left._1 + right._1, left._2, left._3))
       .mapValues(value => calculateCorrelation(value))
     bookPairsRDD.unpersist()
     //getting bookid, Array[bookid]
@@ -65,48 +60,28 @@ class SubjectsSparkRecommender @Inject()(val configuration: play.api.Configurati
       Array((book1Id, (book2Id, optionCorrelation)), (book2Id, (book1Id, optionCorrelation)))
     }
       .flatMap(x => x)
-      .map { ln => (ln._1, List(ln._2)) }
-      .reduceByKey((left, right) => left.++(right))
-      .map { case (bookId, similarBooksList) =>
-        val arrayOfSimilarBooks = similarBooksList.toArray.sortBy(_._2).reverse.map(line => line._1)
+      .aggregateByKey(mutable.HashSet.empty[(Int, Option[Double])])(addToSet, mergePartitionSets)
+      .map { case (bookId, similarBooksSet) =>
+        val arrayOfSimilarBooks = similarBooksSet.toArray.sortBy(_._2).reverse.map(line => line._1)
         if (arrayOfSimilarBooks.length >= numOfSimilarBooksToFind_)
           (bookId, arrayOfSimilarBooks.take(numOfSimilarBooksToFind_))
         else (bookId, arrayOfSimilarBooks)
       }
     joinedBooksRDD.unpersist()
-    updateMongoCollectionWithRdd(booksCollectionName_,
-      similarBooksIdsRdd.map { resTuple =>
-        (new Object, getMongoUpdateWritableFromIdValueTuple[Int, Array[Int]](resTuple, "_id", "similarBooks"))
-      })
-    similarBooksIdsRdd.take(5).foreach(x => println(x._1 + " and recs:  " + x._2.mkString(" | ")))
+    updateMongoCollectionWithRdd(booksCollectionName_, similarBooksIdsRdd.map { resTuple =>
+      (new Object, getMongoUpdateWritableFromIdValueTuple[Int, Array[Int]](resTuple, "_id", "similarBooks"))
+    })
     similarBooksIdsRdd.unpersist()
   }
 
-  //getting distinct features and number of books with this feature rdd
-  private def calculateDistinctFeaturesCounts(input: RDD[(Int, Array[String])]): RDD[(String, Int)] = {
-    val newRdd = input.map(inp => inp._2)
-      .flatMap(str => str).map(s => (s, 1))
-      .reduceByKey((a, b) => a + b)
-      .filter(_._2 >= 2)
-    println("Distinct features:" + newRdd.count())
-    newRdd
-  }
+  private def calculateCorrelation(input: (Int, Int, Int)): Option[Double] = {
+    val numCommonFeatures = input._1
+    val num1Features = input._2
+    val num2Features = input._3
 
-  private def calculateCorrelation(input: Iterable[(Int, Int, Int)]): Option[Double] = {
-    val inputArr = input.toArray
-    if (inputArr.length > 0) {
-      val numCommonFeatures = inputArr.size
+    val numerator = numCommonFeatures
+    val denominator = num1Features + num2Features
+    Some(numerator.toDouble / denominator.toDouble)
 
-      val num1Features = inputArr(0)._1
-      val num2Features = inputArr(0)._2
-      val sumOfFeatureCollectionFrequencies = inputArr.map(_._3).sum
-
-      val numerator = numCommonFeatures
-      val denominator = num1Features + num2Features
-      Some(numerator.toDouble / denominator.toDouble)
-    }
-    else {
-      throw new Exception("Feature array size = 0!")
-    }
   }
 }

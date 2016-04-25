@@ -7,11 +7,14 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.mllib.recommendation.Rating
 import org.apache.spark.rdd.RDD
 import org.bson.BSONObject
+
+import scala.collection.mutable
+
 /**
   * Created by P. Akhmedzianov on 03.03.2016.
   */
 abstract class SparkMongoHandler(configuration: play.api.Configuration)
-extends java.io.Serializable{
+  extends java.io.Serializable {
   val ratingsCollectionName_ = configuration.getString("mongodb.ratingsCollectionName")
     .getOrElse("ratings")
   val usersCollectionName_ = configuration.getString("mongodb.usersCollectionName")
@@ -22,12 +25,12 @@ extends java.io.Serializable{
   val mongoDbUri_ = configuration.getString("mongodb.uri")
     .getOrElse("mongodb://localhost:27017/BookRecommenderDB")
 
-  def transformToRatingRdd(inputRdd:RDD[(Int, (Int, Double))]):RDD[Rating]={
+  def transformToRatingRdd(inputRdd: RDD[(Int, (Int, Double))]): RDD[Rating] = {
     inputRdd.map(inputLine => new Rating(inputLine._1, inputLine._2._1, inputLine._2._2))
   }
 
-  def transformToUserKeyRdd(inputRdd:RDD[Rating]):RDD[(Int, (Int, Double))]={
-    inputRdd.map{case Rating(user, product, rate) => (user,(product,rate))}
+  def transformToUserKeyRdd(inputRdd: RDD[Rating]): RDD[(Int, (Int, Double))] = {
+    inputRdd.map { case Rating(user, product, rate) => (user, (product, rate)) }
   }
 
   def getCollectionFromMongoRdd(inputCollectionName: String):
@@ -44,8 +47,8 @@ extends java.io.Serializable{
     fromMongoRdd
   }
 
-  def updateMongoCollectionWithRdd(updateCollectionName:String,
-                                   toMongoUpdateRdd:RDD[(Object, MongoUpdateWritable)]): Unit ={
+  def updateMongoCollectionWithRdd(updateCollectionName: String,
+                                   toMongoUpdateRdd: RDD[(Object, MongoUpdateWritable)]): Unit = {
     val outputConfig = new Configuration()
     outputConfig.set("mongo.output.uri", mongoDbUri_ + "." + updateCollectionName)
     toMongoUpdateRdd.saveAsNewAPIHadoopFile(
@@ -57,7 +60,7 @@ extends java.io.Serializable{
   }
 
   def getKeyValueRatings(inputRdd: RDD[(Object, BSONObject)]):
-  RDD[(Int, (Int, Double))]={
+  RDD[(Int, (Int, Double))] = {
     val res = inputRdd.map(arg => {
       (arg._2.get("users_id").asInstanceOf[Int], (arg._2.get("books_id").asInstanceOf[Int],
         arg._2.get("rate").asInstanceOf[Double]))
@@ -65,15 +68,20 @@ extends java.io.Serializable{
     res
   }
 
-  def getMongoUpdateWritableFromIdValueTuple[ID,VAL](tuple:(ID, VAL), idFieldName:String,
-                                                     valueFieldName:String):MongoUpdateWritable={
+  def getMongoUpdateWritableFromIdValueTuple[ID, VAL](tuple: (ID, VAL), idFieldName: String,
+                                                      valueFieldName: String): MongoUpdateWritable = {
     new MongoUpdateWritable(
-      new BasicDBObject(idFieldName, tuple._1),  // Query
-      new BasicDBObject("$set", new BasicDBObject(valueFieldName, tuple._2)),  // Update operation
-      false,  // Upsert
-      false   // Update multiple documents
+      new BasicDBObject(idFieldName, tuple._1), // Query
+      new BasicDBObject("$set", new BasicDBObject(valueFieldName, tuple._2)), // Update operation
+      false, // Upsert
+      false // Update multiple documents
     )
   }
+
+  def addToSet[T](s: mutable.HashSet[T], v: T): mutable.HashSet[T] = s += v
+
+  def mergePartitionSets[T](p1: mutable.HashSet[T],
+                            p2: mutable.HashSet[T]): mutable.HashSet[T] = p1 ++= p2
 }
 
 

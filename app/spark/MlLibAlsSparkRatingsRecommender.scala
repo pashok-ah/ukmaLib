@@ -5,6 +5,9 @@ import javax.inject.{Inject, Singleton}
 import org.apache.spark.mllib.recommendation.{ALS, MatrixFactorizationModel, Rating}
 import org.apache.spark.rdd.RDD
 import play.api.Configuration
+
+import scala.collection.mutable
+
 /**
   * Created by P. Akhmedzianov on 03.03.2016.
   */
@@ -28,7 +31,7 @@ class MlLibAlsSparkRatingsRecommender @Inject()(val configuration: Configuration
 
   protected var trainRatingsRddOption_ : Option[RDD[Rating]] = None
   protected var validationRatingsRddOption_ : Option[RDD[Rating]] = None
-  private var testRatingsRddOption_ : Option[RDD[Rating]] = None
+  protected var testRatingsRddOption_ : Option[RDD[Rating]] = None
 
   def test(): Unit = {
     initialize (isTuningParameters = true, isInitializingValidationRdd = true,
@@ -132,27 +135,26 @@ class MlLibAlsSparkRatingsRecommender @Inject()(val configuration: Configuration
           alsConfigurationOption_.get.trainingShareInArraysOfRates_ * movieRatePairsArray.length).toInt)._1)
       }.flatMapValues(x => x)
 
-      trainRatingsRddOption_ = Some(transformToRatingRdd(trainRdd))
+      trainRatingsRddOption_ = Some(transformToRatingRdd(trainRdd).cache())
 
       val afterSubtractionRdd = filteredInputRdd.subtract(trainRdd)
       if (isInitializingValidationRdd && isInitializingTestRdd) {
         val validateAndTestRdds = afterSubtractionRdd.randomSplit(
           Array(alsConfigurationOption_.get.validationShareAfterSubtractionTraining_,
             1 - alsConfigurationOption_.get.validationShareAfterSubtractionTraining_))
-        validationRatingsRddOption_ = Some(transformToRatingRdd(validateAndTestRdds(0)))
-        testRatingsRddOption_ = Some(transformToRatingRdd(validateAndTestRdds(1)))
+        validationRatingsRddOption_ = Some(transformToRatingRdd(validateAndTestRdds(0)).cache())
+        testRatingsRddOption_ = Some(transformToRatingRdd(validateAndTestRdds(1)).cache())
       }
       else if (isInitializingValidationRdd) {
-        validationRatingsRddOption_ = Some(transformToRatingRdd(afterSubtractionRdd))
+        validationRatingsRddOption_ = Some(transformToRatingRdd(afterSubtractionRdd).cache())
       }
       else {
-        testRatingsRddOption_ = Some(transformToRatingRdd(afterSubtractionRdd))
+        testRatingsRddOption_ = Some(transformToRatingRdd(afterSubtractionRdd).cache())
       }
     }
     else {
-      trainRatingsRddOption_ = Some(transformToRatingRdd(filteredInputRdd))
+      trainRatingsRddOption_ = Some(transformToRatingRdd(filteredInputRdd).cache())
     }
-    println("Train rdd size"+trainRatingsRddOption_.get.count())
   }
 
 
@@ -198,7 +200,8 @@ class MlLibAlsSparkRatingsRecommender @Inject()(val configuration: Configuration
         })
       }
       val trueBooksWithPositiveRateAndPredictedBooks = usersWithPositiveRatings.join(predictions)
-      val meanAveragePrecision = trueBooksWithPositiveRateAndPredictedBooks.map { case (user, (trueBooks, predictedBooks)) =>
+      val meanAveragePrecision = trueBooksWithPositiveRateAndPredictedBooks
+        .map { case (user, (trueBooks, predictedBooks)) =>
         val trueBooksArray = trueBooks.toArray
         val minNumberOfTrueRatesAndK = Math.min(trueBooksArray.length, K)
         var precision = 0
@@ -231,9 +234,12 @@ class MlLibAlsSparkRatingsRecommender @Inject()(val configuration: Configuration
 
   def filterInputByNumberOfKeyEntriesRdd(inputRdd: RDD[(Int, (Int, Double))],
                                          threshold: Int): RDD[(Int, (Int, Double))] = {
-    val filteredRatingsRdd = inputRdd.groupByKey().filter { groupedLine =>
-      groupedLine._2.size >= threshold
-    }.flatMapValues(x => x)
+    val filteredRatingsRdd = inputRdd
+      .aggregateByKey(mutable.HashSet.empty[(Int, Double)])(addToSet, mergePartitionSets)
+      .filter { groupedLine =>
+        groupedLine._2.size >= threshold
+      }
+      .flatMapValues(x => x)
     filteredRatingsRdd
   }
 
