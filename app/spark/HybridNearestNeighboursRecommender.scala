@@ -57,7 +57,7 @@ class HybridNearestNeighboursRecommender @Inject()(configuration: Configuration)
   }
 
   def initializeNeighboursRdd(numberOfNeighbours: Int) = {
-    val userFeaturesRdd = getUserFeaturesRdd()
+    val userFeaturesRdd = getUserFeaturesRdd
 
     val joinedRdd = userFeaturesRdd.cartesian(userFeaturesRdd)
       .filter(tuple => tuple._1._1 < tuple._2._1)

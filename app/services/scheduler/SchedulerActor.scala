@@ -29,7 +29,7 @@ class SchedulerActor @Inject() (bookUpdater :  BookGlobalRatingsUpdater,
 
   def updatePersonalReommendationsInDb(): Unit ={
     println("Updating personal recommendations...")
-    mlLibAlsSparkRatingsFromMongoHandler.updateRecommendationsInMongo (isTuning = false)
+    mlLibAlsSparkRatingsFromMongoHandler.updateRecommendationsInMongo (isTuning = true)
   }
 
   def updateYouMayAlsoLikeBooks(): Unit ={

@@ -114,9 +114,6 @@ $(function() {
                     datatype: "text",
                     success: function(response){
                         switch (response) {
-                            case 'Error':
-                                $("#user-rate-info").text("Error occured!");
-                                break;
                             case 'Success':
                                 onSuccessUpdate(currentRating);
                                 break;

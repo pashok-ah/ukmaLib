@@ -12,7 +12,10 @@ case class AlsConfiguration(// default ALS parameters
                             //lists for hyper-parameter grid search
                             ranksList_ : List[Int] = List(20),
                             lambdasList_ : List[Double] = List(0.1, 1.0),
-                            numbersOfIterationsList_ : List[Int] = List(20))
+                            numbersOfIterationsList_ : List[Int] = List(20),
+                           //parameters for Random search
+                            numberOfSearchSteps_ :Int = 10,
+                            stepRadius_ : Double = 1.0)
 
 object SparkAlsPropertiesLoader {
   val defaultPath = "conf/sparkAlsConfiguration.xml"
@@ -48,6 +51,8 @@ object SparkAlsPropertiesLoader {
       override val ranksList_ = (node \\ "rankVariant").iterator.map(_.text.toInt).toList
       override val lambdasList_ = (node \\ "lambdaVariant").iterator.map(_.text.toDouble).toList
       override val numbersOfIterationsList_ = (node \\ "numberOfIterationsVariant").iterator.map(_.text.toInt).toList
+      override val numberOfSearchSteps_ = (node \ "numberOfSearchSteps").text.toInt
+      override val stepRadius_ = (node \ "stepRadius").text.toDouble
     }
 
 
@@ -68,6 +73,8 @@ object SparkAlsPropertiesLoader {
         {alsProperties.numbersOfIterationsList_.map(numberOfIterations =>
         <numberOfIterationsVariant>{numberOfIterations}</numberOfIterationsVariant>)}
       </numbersIterations>
+      <numberOfSearchSteps>{alsProperties.numberOfSearchSteps_}</numberOfSearchSteps>
+      <stepRadius>{alsProperties.stepRadius_}</stepRadius>
     </alsConfiguration>
   }
 }

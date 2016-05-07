@@ -84,5 +84,46 @@ abstract class SparkMongoHandler(configuration: play.api.Configuration)
                             p2: mutable.HashSet[T]): mutable.HashSet[T] = p1 ++= p2
 }
 
+trait EvaluationMetrics{
+  def predict(userProducts:RDD[(Int, Int)]):RDD[Rating]
 
+  def getRmseForRdd(ratings: RDD[Rating]): Double = {
+    // Evaluate the model on rating data
+    val usersProducts = ratings.map { case Rating(user, product, rate) =>
+      (user, product)
+    }
+    val predictions =
+      predict(usersProducts).map { case Rating(user, product, rate) =>
+        ((user, product), rate)
+      }
+    val ratesAndPredictions = ratings.map { case Rating(user, product, rate) =>
+      ((user, product), rate)
+    }.join(predictions)
+    val meanSquaredError = ratesAndPredictions.map { case ((user, product), (r1, r2)) =>
+      val err = r1 - r2
+      err * err
+    }.mean()
+    Math.sqrt(meanSquaredError)
+  }
+
+  def getMaeForRdd(ratings: RDD[Rating]): Double = {
+    // Evaluate the model on rating data
+    val usersProducts = ratings.map { case Rating(user, product, rate) =>
+      (user, product)
+    }
+    val predictions =
+      predict(usersProducts).map { case Rating(user, product, rate) =>
+        ((user, product), rate)
+      }
+    val ratesAndPredictions = ratings.map { case Rating(user, product, rate) =>
+      ((user, product), rate)
+    }.join(predictions)
+    val meanAverageError = ratesAndPredictions.map { case ((user, product), (r1, r2)) =>
+      val err = r1 - r2
+      Math.abs(err)
+    }.mean()
+    meanAverageError
+  }
+
+}
 

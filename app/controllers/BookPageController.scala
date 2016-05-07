@@ -79,12 +79,12 @@ class BookPageController @Inject()(override implicit val env: MyEnvironment,
         request.user.userIntId.get, bookId, rate))
       val httpResponse = createResultFuture.map {
         case Right(res) => Ok(res.stringify)
-        case _ => Ok("Error")
+        case _ => InternalServerError
       }
       httpResponse
     }
     else {
-      Future.successful(Ok("Error"))
+      Future.successful(BadRequest)
     }
   }
 
@@ -94,12 +94,12 @@ class BookPageController @Inject()(override implicit val env: MyEnvironment,
       val updateFuture = myRatingsMongoService.updateExistingRating(bsonMyRatingIdTry.get, rate)
       val httpResponse = updateFuture.map {
         case updateWriteResult if updateWriteResult.ok  => Ok("Success")
-        case _ => Ok("Error")
+        case _ => InternalServerError
       }
       httpResponse
     }
     else {
-      Future.successful(Ok("Error"))
+      Future.successful(BadRequest)
     }
   }
 
@@ -109,12 +109,12 @@ class BookPageController @Inject()(override implicit val env: MyEnvironment,
       val deleteFuture = myRatingsMongoService.delete(bsonMyRatingIdTry.get)
       val httpResponse = deleteFuture.map {
         case Right(res) => Ok("Success")
-        case _ => Ok("Error")
+        case _ => InternalServerError
       }
       httpResponse
     }
     else {
-      Future.successful(Ok("Error"))
+      Future.successful(BadRequest)
     }
   }
 
