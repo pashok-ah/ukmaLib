@@ -1,12 +1,9 @@
 package services.secsocial
 
-import javax.inject.Inject
-
 import controllers.CustomRoutesService
 import models.User
 import securesocial.core.RuntimeEnvironment
-import securesocial.core.providers.{FacebookProvider, UsernamePasswordProvider}
-import services.mongo.UsersMongoService
+import securesocial.core.providers.{FacebookProvider, GoogleProvider, UsernamePasswordProvider}
 
 import scala.collection.immutable.ListMap
 
@@ -20,11 +17,8 @@ class MyEnvironment
   override lazy val viewTemplates = new MyViewTemplates(this)
   override lazy val providers = ListMap(
     include(new FacebookProvider(routes, cacheService, oauth2ClientFor(FacebookProvider.Facebook))),
+    include(new GoogleProvider(routes, cacheService, oauth2ClientFor(GoogleProvider.Google))),
     include(new UsernamePasswordProvider[User](userService, avatarService, viewTemplates, passwordHashers))
   )
 }
 
-/*
-class MyBasicEnvironment @Inject() (val env: MyEnvironment[U]) extends RuntimeEnvironment.Default[U] {
-  override lazy val userService: InMemoryUserService = env.userService
-}*/

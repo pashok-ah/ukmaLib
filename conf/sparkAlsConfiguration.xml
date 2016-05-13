@@ -1,18 +1,18 @@
 <alsConfiguration>
-      <rank>21</rank>
+      <rank>12</rank>
       <numIterations>30</numIterations>
-      <lambda>0.9762965206318217</lambda>
+      <lambda>8.750732843956996</lambda>
       <trainingShare>0.6</trainingShare>
       <validationShare>0.5</validationShare>
       <ranks>
-        <rankVariant>20</rankVariant><rankVariant>18</rankVariant>
+        <rankVariant>20</rankVariant><rankVariant>15</rankVariant><rankVariant>30</rankVariant><rankVariant>50</rankVariant>
       </ranks>
       <lambdas>
-        <lambdaVariant>0.1</lambdaVariant><lambdaVariant>1.0</lambdaVariant>
+        <lambdaVariant>0.1</lambdaVariant><lambdaVariant>1.0</lambdaVariant><lambdaVariant>10.0</lambdaVariant>
       </lambdas>
       <numbersIterations>
-        <numberOfIterationsVariant>20</numberOfIterationsVariant>
+        <numberOfIterationsVariant>30</numberOfIterationsVariant>
       </numbersIterations>
-      <numberOfSearchSteps>11</numberOfSearchSteps>
-      <stepRadius>1.1</stepRadius>
+      <numberOfSearchSteps>10</numberOfSearchSteps>
+      <stepRadius>2.5</stepRadius>
     </alsConfiguration>

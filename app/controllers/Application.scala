@@ -24,7 +24,7 @@ import models.User
 import play.api.Play.current
 import play.api.i18n.Messages
 import play.api.i18n.Messages.Implicits._
-import play.api.mvc.{Action, RequestHeader}
+import play.api.mvc.Action
 import securesocial.core._
 
 import scala.concurrent.Future
@@ -68,26 +68,5 @@ class Application @Inject()(override implicit val env: MyEnvironment,
         implicitly[MyEnvironment]))
     )
   }
-
-  // a sample action using an authorization implementation
-  def onlyTwitter = SecuredAction(WithProvider("facebook")) { implicit request =>
-    Ok("You can see this because you logged in using Twitter")
-  }
-
-  /**
-    * Sample use of SecureSocial.currentUser. Access the /current-user to test it
-    */
-  def currentUser = Action.async { implicit request =>
-    SecureSocial.currentUser.map { maybeUser =>
-      val userId = maybeUser.map(_.main.userId).getOrElse("unknown")
-      Ok(s"Your id is $userId")
-    }
-  }
 }
 
-// An Authorization implementation that only authorizes uses that logged in using twitter
-case class WithProvider(provider: String) extends Authorization[User] {
-  def isAuthorized(user: User, request: RequestHeader) = {
-    user.main.providerId == provider
-  }
-}

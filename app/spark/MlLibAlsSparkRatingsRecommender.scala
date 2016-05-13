@@ -14,7 +14,7 @@ import scala.util.Random
   */
 @Singleton
 class MlLibAlsSparkRatingsRecommender @Inject()(val configuration: Configuration)
-  extends SparkMongoHandler(configuration) with java.io.Serializable with EvaluationMetrics{
+  extends SparkMongoHandler(configuration) with java.io.Serializable with EvaluationMetrics {
 
   val configurationPath_ = configuration.getString(
     "mlLibAlsSparkRatingsRecommender.configurationPath").getOrElse(
@@ -30,18 +30,26 @@ class MlLibAlsSparkRatingsRecommender @Inject()(val configuration: Configuration
 
   private var matrixFactorizationModelOption_ : Option[MatrixFactorizationModel] = None
 
+  protected val trainRatingsRddPath_ = "G:\\input\\trainRatingsRdd"
+  protected val validationRatingsRddPath_ = "G:\\input\\validationRatingsRdd"
+  protected val testRatingsRddPath_ = "G:\\input\\testRatingsRdd"
+
   protected var trainRatingsRddOption_ : Option[RDD[Rating]] = None
   protected var validationRatingsRddOption_ : Option[RDD[Rating]] = None
   protected var testRatingsRddOption_ : Option[RDD[Rating]] = None
 
-  def updateRecommendationsInMongo(isTuning : Boolean): Unit ={
-    initialize(isTuning, isTuning, isInitializingTestRdd = false)
+  def updateRecommendationsInMongo(isTuning: Boolean): Unit = {
+    initialize(isTuning)
     exportAllPredictionsToMongo(numberOfRecommendedBooks_)
+        trainRatingsRddOption_.get.unpersist()
+    if (isTuning) {
+            validationRatingsRddOption_.get.unpersist()
+            testRatingsRddOption_.get.unpersist()
+    }
   }
 
   def test(): Unit = {
-    initialize (isTuningParameters = true, isInitializingValidationRdd = true,
-      isInitializingTestRdd = true)
+    initialize(isTuningParameters = true)
     matrixFactorizationModelOption_ match {
       case Some(matrixModel) =>
         println("Train RMSE = " + getRmseForRdd(trainRatingsRddOption_.get))
@@ -51,95 +59,66 @@ class MlLibAlsSparkRatingsRecommender @Inject()(val configuration: Configuration
     }
   }
 
-  protected def initialize(isTuningParameters: Boolean, isInitializingValidationRdd: Boolean,
-                 isInitializingTestRdd: Boolean): Unit = {
-    if (isTuningParameters && !isInitializingValidationRdd){
-      throw new IllegalArgumentException
+  protected def initialize(isTuningParameters: Boolean,
+                           evaluateMetric: RDD[Rating] => Double = getMaeForRdd): Unit = {
+    alsConfigurationOption_ = Some(SparkAlsPropertiesLoader.loadFromDisk(configurationPath_))
+    initializeRdds(filterInputByNumberOfKeyEntriesRdd(getKeyValueRatings(
+      getCollectionFromMongoRdd(ratingsCollectionName_)), minNumberOfRatesToGetRecommendations_),
+      isTuningParameters)
+    if (isTuningParameters) {
+      tuneHyperParametersWithGridSearch(evaluateMetric)
+      tuneHyperParametersWithRandomSearch(evaluateMetric)
     }
-    else {
-      alsConfigurationOption_ = Some(SparkAlsPropertiesLoader.loadFromDisk(configurationPath_))
-      initializeRdds(filterInputByNumberOfKeyEntriesRdd(getKeyValueRatings(
-        getCollectionFromMongoRdd(ratingsCollectionName_)),minNumberOfRatesToGetRecommendations_),
-        isInitializingValidationRdd, isInitializingTestRdd)
-      if (isTuningParameters) tuneHyperParametersWithRandomSearch(getRmseForRdd,
-        alsConfigurationOption_.get.numberOfSearchSteps_, alsConfigurationOption_.get.stepRadius_)
-      initializeModelWithRdd(trainRatingsRddOption_.get)
-    }
+    initializeModelWithRdd(trainRatingsRddOption_.get)
   }
 
 
   private def initializeModelWithRdd(ratingsRdd: RDD[Rating]) = {
-    if(alsConfigurationOption_.isDefined) {
+    if (alsConfigurationOption_.isDefined) {
       matrixFactorizationModelOption_ = Some(ALS.train(ratingsRdd, alsConfigurationOption_.get.rank_,
         alsConfigurationOption_.get.numIterations_, alsConfigurationOption_.get.lambda_))
-    } else{
+    } else {
       throw new IllegalStateException()
     }
   }
-
-  private def initializeModelWithAllData(): Unit ={
-    if(trainRatingsRddOption_.isDefined && alsConfigurationOption_.isDefined){
-      matrixFactorizationModelOption_ = Some(ALS.train(getUnitedInputRdd(), alsConfigurationOption_.get.rank_,
-        alsConfigurationOption_.get.numIterations_, alsConfigurationOption_.get.lambda_))
-    }
-    else{
-      throw new IllegalStateException()
-    }
-  }
-
-  protected  def getUnitedInputRdd():RDD[Rating]={
-    var unitedRdd = trainRatingsRddOption_.get
-    if(validationRatingsRddOption_.isDefined) unitedRdd = unitedRdd.union(validationRatingsRddOption_.get)
-    if(testRatingsRddOption_.isDefined) unitedRdd = unitedRdd.union(testRatingsRddOption_.get)
-    unitedRdd
-  }
-
 
   private def initializeRdds(filteredInputRdd: RDD[(Int, (Int, Double))],
-                             isInitializingValidationRdd: Boolean,
-                             isInitializingTestRdd: Boolean): Unit = {
-    if ((isInitializingValidationRdd || isInitializingTestRdd) && alsConfigurationOption_.isDefined) {
-      val gropedByKeyRdd = filteredInputRdd.groupByKey()
+                             isTuning: Boolean): Unit = {
+    if (isTuning && alsConfigurationOption_.isDefined) {
+      val trainRdd = filteredInputRdd
+        .aggregateByKey(mutable.HashSet.empty[(Int, Double)])(addToSet, mergePartitionSets)
+        .map { groupedLine =>
+          val movieRatePairsArray = groupedLine._2.toArray
+          (groupedLine._1, movieRatePairsArray.splitAt(Math.ceil(
+            alsConfigurationOption_.get.trainingShareInArraysOfRates_ * movieRatePairsArray.length).toInt)._1)
+        }.flatMapValues(x => x)
 
-      val trainRdd = gropedByKeyRdd.map { groupedLine =>
-        val movieRatePairsArray = groupedLine._2.toArray
-        (groupedLine._1, movieRatePairsArray.splitAt(Math.ceil(
-          alsConfigurationOption_.get.trainingShareInArraysOfRates_ * movieRatePairsArray.length).toInt)._1)
-      }.flatMapValues(x => x)
-
-      trainRatingsRddOption_ = Some(transformToRatingRdd(trainRdd).cache())
+      trainRatingsRddOption_ = Some(transformToRatingRdd(trainRdd).persist())
 
       val afterSubtractionRdd = filteredInputRdd.subtract(trainRdd)
-      if (isInitializingValidationRdd && isInitializingTestRdd) {
-        val validateAndTestRdds = afterSubtractionRdd.randomSplit(
-          Array(alsConfigurationOption_.get.validationShareAfterSubtractionTraining_,
-            1 - alsConfigurationOption_.get.validationShareAfterSubtractionTraining_))
-        validationRatingsRddOption_ = Some(transformToRatingRdd(validateAndTestRdds(0)).cache())
-        testRatingsRddOption_ = Some(transformToRatingRdd(validateAndTestRdds(1)).cache())
-      }
-      else if (isInitializingValidationRdd) {
-        validationRatingsRddOption_ = Some(transformToRatingRdd(afterSubtractionRdd).cache())
-      }
-      else {
-        testRatingsRddOption_ = Some(transformToRatingRdd(afterSubtractionRdd).cache())
-      }
+
+      val validateAndTestRdds = afterSubtractionRdd.randomSplit(
+        Array(alsConfigurationOption_.get.validationShareAfterSubtractionTraining_,
+          1 - alsConfigurationOption_.get.validationShareAfterSubtractionTraining_))
+      validationRatingsRddOption_ = Some(transformToRatingRdd(validateAndTestRdds(0)).persist())
+      testRatingsRddOption_ = Some(transformToRatingRdd(validateAndTestRdds(1)).persist())
     }
     else {
-      trainRatingsRddOption_ = Some(transformToRatingRdd(filteredInputRdd).cache())
+      trainRatingsRddOption_ = Some(transformToRatingRdd(filteredInputRdd).persist())
     }
   }
 
-  override def predict(userProducts:RDD[(Int, Int)]):RDD[Rating]={
-    if(matrixFactorizationModelOption_.isDefined) {
+  override def predict(userProducts: RDD[(Int, Int)]): RDD[Rating] = {
+    if (matrixFactorizationModelOption_.isDefined) {
       matrixFactorizationModelOption_.get.predict(userProducts)
     }
-    else{
-      throw  new IllegalStateException("Matrix factorization model is not defined!")
+    else {
+      throw new IllegalStateException("Matrix factorization model is not defined!")
     }
   }
 
   private def getMeanAveragePrecisionForRdd(ratings: RDD[Rating]): Double = {
-    if(matrixFactorizationModelOption_.isDefined) {
+    if (matrixFactorizationModelOption_.isDefined) {
       // Evaluate the model on rating data
       val K = 10
       val usersWithPositiveRatings = ratings.filter { case Rating(user, product, rate) => rate > 5 }.map {
@@ -154,28 +133,29 @@ class MlLibAlsSparkRatingsRecommender @Inject()(val configuration: Configuration
       val trueBooksWithPositiveRateAndPredictedBooks = usersWithPositiveRatings.join(predictions)
       val meanAveragePrecision = trueBooksWithPositiveRateAndPredictedBooks
         .map { case (user, (trueBooks, predictedBooks)) =>
-        val trueBooksArray = trueBooks.toArray
-        val minNumberOfTrueRatesAndK = Math.min(trueBooksArray.length, K)
-        var precision = 0
-        for (k <- predictedBooks.indices) {
-          val addition = if (trueBooksArray.contains(predictedBooks(k))) k else 0
-          precision += addition
-        }
-        precision.toDouble / minNumberOfTrueRatesAndK
-      }.mean()
+          val trueBooksArray = trueBooks.toArray
+          val minNumberOfTrueRatesAndK = Math.min(trueBooksArray.length, K)
+          var precision = 0
+          for (k <- predictedBooks.indices) {
+            val addition = if (trueBooksArray.contains(predictedBooks(k))) k else 0
+            precision += addition
+          }
+          precision.toDouble / minNumberOfTrueRatesAndK
+        }.mean()
       meanAveragePrecision
     }
-    else{
+    else {
       throw new IllegalStateException()
     }
   }
 
-  private def exportAllPredictionsToMongo(numberOfRecommendations:Int): Unit = {
-    if(matrixFactorizationModelOption_.isDefined) {
-      val predictionsRdd  = matrixFactorizationModelOption_.get.recommendProductsForUsers(
-        numberOfRecommendations).mapValues{arrayRatings => arrayRatings.map{
+  private def exportAllPredictionsToMongo(numberOfRecommendations: Int): Unit = {
+    if (matrixFactorizationModelOption_.isDefined) {
+      val predictionsRdd = matrixFactorizationModelOption_.get.recommendProductsForUsers(
+        numberOfRecommendations).mapValues { arrayRatings => arrayRatings.map {
         case Rating(userId, bookId, rate) => bookId
-      }}
+      }
+      }
       updateMongoCollectionWithRdd(usersCollectionName_,
         predictionsRdd.map { resTuple =>
           (new Object, getMongoUpdateWritableFromIdValueTuple[Int, Array[Int]](resTuple, "_id",
@@ -184,122 +164,105 @@ class MlLibAlsSparkRatingsRecommender @Inject()(val configuration: Configuration
     }
   }
 
+  // also filtering implicit ratings in dataset (removing zeros)
   def filterInputByNumberOfKeyEntriesRdd(inputRdd: RDD[(Int, (Int, Double))],
                                          threshold: Int): RDD[(Int, (Int, Double))] = {
     val filteredRatingsRdd = inputRdd
+      .filter { case (userId, (bookId, rate)) => rate != 0.0 }
       .aggregateByKey(mutable.HashSet.empty[(Int, Double)])(addToSet, mergePartitionSets)
       .filter { groupedLine =>
         groupedLine._2.size >= threshold
       }
       .flatMapValues(x => x)
+    println("Count after filtering:" + filteredRatingsRdd.count())
     filteredRatingsRdd
   }
 
-  protected def getUserFeaturesRdd:RDD[(Int, Array[Double])]={
-    if(matrixFactorizationModelOption_.isDefined) {
+  protected def getUserFeaturesRdd: RDD[(Int, Array[Double])] = {
+    if (matrixFactorizationModelOption_.isDefined) {
       matrixFactorizationModelOption_.get.userFeatures
     }
-    else{
+    else {
       throw new IllegalStateException()
     }
   }
 
-  def predict(user: Int, product: Int): Double = {
-    matrixFactorizationModelOption_ match {
-      case Some(matrixModel) =>
-        matrixModel.predict(user, product)
-      case None => throw new IllegalStateException()
-    }
+  protected def tuneHyperParametersWithGridSearch(evaluateMetric: RDD[Rating] => Double): Unit = {
+    tuneHyperParameters(evaluateMetric, gridSearch)
   }
 
-  def recommendProducts(user: Int, num: Int): Map[Int, Double] = {
-    matrixFactorizationModelOption_ match {
-      case Some(matrixModel) =>
-        def resFromModel = matrixModel.recommendProducts(user, num)
-        def res = resFromModel.map(rate => rate.product -> rate.rating).toMap
-        res
-      case None => throw new IllegalStateException()
-    }
-  }
-
-  private def tuneHyperParametersWithGridSearch(evaluateMetric: RDD[Rating]=>Double): Unit = {
-    if(alsConfigurationOption_.isDefined && trainRatingsRddOption_.isDefined &&
-      validationRatingsRddOption_.isDefined){
-      matrixFactorizationModelOption_ = Some(ALS.train(trainRatingsRddOption_.get, alsConfigurationOption_.get.rank_,
-        alsConfigurationOption_.get.numIterations_, alsConfigurationOption_.get.lambda_))
-      var currentBestValidationMetricValue = evaluateMetric(validationRatingsRddOption_.get)
-
-      for (rank <- alsConfigurationOption_.get.ranksList_;
-           lambda <- alsConfigurationOption_.get.lambdasList_;
-           numberOfIterations <- alsConfigurationOption_.get.numbersOfIterationsList_) {
-        matrixFactorizationModelOption_ = Some(ALS.train(trainRatingsRddOption_.get, rank, numberOfIterations, lambda))
-        val validationEvaluateMetric = evaluateMetric(validationRatingsRddOption_.get)
-        println("RMSE (validation) = " + validationEvaluateMetric + " for the model trained with rank = "
-          + rank + ", lambda = " + lambda + ", and numIter = " + numberOfIterations + ".")
-        if (validationEvaluateMetric < currentBestValidationMetricValue) {
-          currentBestValidationMetricValue = validationEvaluateMetric
-          alsConfigurationOption_ = Some(alsConfigurationOption_.get.copy(rank_ = rank,
-            numIterations_ = numberOfIterations, lambda_ = lambda ))
-        }
-      }
-      println("The best model was trained with rank = " + alsConfigurationOption_.get.rank_ +
-        " and lambda = " + alsConfigurationOption_.get.lambda_ + ", and numIter = " +
-        alsConfigurationOption_.get.numIterations_ + ", and its RMSE on the test set is "
-        + currentBestValidationMetricValue + ".")
-      SparkAlsPropertiesLoader.saveToDisk(configurationPath_, alsConfigurationOption_.get)
-    }
-    else{
-      throw new IllegalStateException()
-    }
+  protected def tuneHyperParametersWithRandomSearch(evaluateMetric: RDD[Rating] => Double): Unit = {
+    tuneHyperParameters(evaluateMetric, randomSearch)
   }
 
   // tuning only number of factors and lambda
-  private def tuneHyperParametersWithRandomSearch(evaluateMetric: RDD[Rating]=>Double,
-                                                  numberOfIterations:Int, radius:Double): Unit = {
-    if(alsConfigurationOption_.isDefined && trainRatingsRddOption_.isDefined &&
-      validationRatingsRddOption_.isDefined){
+  protected def tuneHyperParameters(evaluateMetric: RDD[Rating] => Double,
+                                    searchFunction: (Double, RDD[Rating] => Double) => Unit): Unit = {
+    if (alsConfigurationOption_.isDefined && trainRatingsRddOption_.isDefined &&
+      validationRatingsRddOption_.isDefined) {
       matrixFactorizationModelOption_ = Some(ALS.train(trainRatingsRddOption_.get, alsConfigurationOption_.get.rank_,
         alsConfigurationOption_.get.numIterations_, alsConfigurationOption_.get.lambda_))
-      var currentBestValidationMetricValue = evaluateMetric(validationRatingsRddOption_.get)
+      val currentBestValidationMetricValue = evaluateMetric(validationRatingsRddOption_.get)
 
-      for (i <- 1 to numberOfIterations){
-        val nextPosition = chooseNextWithAngle((alsConfigurationOption_.get.rank_,
-          alsConfigurationOption_.get.lambda_), radius)
-        matrixFactorizationModelOption_ = Some(ALS.train(trainRatingsRddOption_.get, nextPosition._1,
-          alsConfigurationOption_.get.numIterations_, nextPosition._2))
-        val validationEvaluateMetric = evaluateMetric(validationRatingsRddOption_.get)
-        println("RMSE (validation) = " + validationEvaluateMetric + " for the model trained with rank = "
-          + nextPosition._1 + ", lambda = " + nextPosition._2 + ", and numIter = " +
-          alsConfigurationOption_.get.numIterations_ + ".")
-
-          if (validationEvaluateMetric < currentBestValidationMetricValue) {
-            currentBestValidationMetricValue = validationEvaluateMetric
-            alsConfigurationOption_ = Some(alsConfigurationOption_.get.copy(rank_ = nextPosition._1,
-              lambda_ = nextPosition._2 ))
-          }
-      }
+      searchFunction(currentBestValidationMetricValue, evaluateMetric)
 
       println("The best model was trained with rank = " + alsConfigurationOption_.get.rank_ +
         " and lambda = " + alsConfigurationOption_.get.lambda_ + ", and numIter = " +
-        alsConfigurationOption_.get.numIterations_ + ", and its RMSE on the test set is "
-        + currentBestValidationMetricValue + ".")
+        alsConfigurationOption_.get.numIterations_ + ", and its Eval metric on the test set is "
+        + evaluateMetric(testRatingsRddOption_.get) + ".")
       SparkAlsPropertiesLoader.saveToDisk(configurationPath_, alsConfigurationOption_.get)
     }
-    else{
+    else {
       throw new IllegalStateException()
     }
   }
 
-  private def chooseNextWithAngle(currentPosition: (Int, Double),
-                                  radius: Double): (Int, Double) = {
-    var x:Double = -1.0
-    var y:Double = -1.0
-    while(x<1||y<0) {
-      val angle = 2 * Math.PI * Random.nextDouble()
-      x = Math.cos(angle) * radius
-      y = Math.sin(angle) * radius
+  private def randomSearch(currentBestMetricValue: Double, evaluateMetric: RDD[Rating] => Double): Unit = {
+    var currentBestValidationMetricValue = currentBestMetricValue
+    for (i <- 1 to alsConfigurationOption_.get.numberOfSearchSteps_) {
+      val nextPosition = chooseNextWithRandomAngle((alsConfigurationOption_.get.rank_,
+        alsConfigurationOption_.get.lambda_), alsConfigurationOption_.get.stepRadius_)
+      matrixFactorizationModelOption_ = Some(ALS.train(trainRatingsRddOption_.get, nextPosition._1,
+        alsConfigurationOption_.get.numIterations_, nextPosition._2))
+      val validationEvaluateMetric = evaluateMetric(validationRatingsRddOption_.get)
+      println("#" + i + " Eval metric (validation) = " + validationEvaluateMetric + " for the model trained with rank = "
+        + nextPosition._1 + ", lambda = " + nextPosition._2 + ", and numIter = " +
+        alsConfigurationOption_.get.numIterations_ + ".")
+
+      if (validationEvaluateMetric < currentBestValidationMetricValue) {
+        currentBestValidationMetricValue = validationEvaluateMetric
+        alsConfigurationOption_ = Some(alsConfigurationOption_.get.copy(rank_ = nextPosition._1,
+          lambda_ = nextPosition._2))
+      }
     }
-    (currentPosition._1+Math.round(x).toInt, currentPosition._2+y)
   }
 
+  private def gridSearch(currentBestMetricValue: Double, evaluateMetric: RDD[Rating] => Double): Unit = {
+    var currentBestValidationMetricValue = currentBestMetricValue
+    for (rank <- alsConfigurationOption_.get.ranksList_;
+         lambda <- alsConfigurationOption_.get.lambdasList_;
+         numberOfIterations <- alsConfigurationOption_.get.numbersOfIterationsList_) {
+      matrixFactorizationModelOption_ = Some(ALS.train(trainRatingsRddOption_.get, rank, numberOfIterations, lambda))
+      val validationEvaluateMetric = evaluateMetric(validationRatingsRddOption_.get)
+      println("Eval metric (validation) = " + validationEvaluateMetric + " for the model trained with rank = "
+        + rank + ", lambda = " + lambda + ", and numIter = " + numberOfIterations + ".")
+      if (validationEvaluateMetric < currentBestValidationMetricValue) {
+        currentBestValidationMetricValue = validationEvaluateMetric
+        alsConfigurationOption_ = Some(alsConfigurationOption_.get.copy(rank_ = rank,
+          numIterations_ = numberOfIterations, lambda_ = lambda))
+      }
+    }
+  }
+
+  private def chooseNextWithRandomAngle(currentPosition: (Int, Double),
+                                        radius: Double): (Int, Double) = {
+    var newPositionX: Double = -1.0
+    var newPositionY: Double = -1.0
+    while (newPositionX < 1.0 || newPositionY < 0.0) {
+      val angle = 2 * Math.PI * Random.nextDouble()
+      newPositionX = currentPosition._1 + Math.cos(angle) * radius
+      newPositionY = currentPosition._2 + Math.sin(angle) * radius
+    }
+    (Math.round(newPositionX).toInt, newPositionY)
+  }
 }

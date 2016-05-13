@@ -20,7 +20,7 @@ object SparkCommons {
       .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
       .set("spark.kryoserializer.buffer","24m")
       .set("spark.kryo.registrator", "spark.MyKryoRegistrator")
-      .set("spark.kryo.registrationRequired", "true")
+/*      .set("spark.kryo.registrationRequired", "true")*/
   }
 
   lazy val sc = new SparkContext(conf)

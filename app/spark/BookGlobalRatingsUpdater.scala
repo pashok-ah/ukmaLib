@@ -21,6 +21,7 @@ class BookGlobalRatingsUpdater @Inject() (val configuration: Configuration)
 
   def setRateCountsAndGlobalRatings(): Unit = {
     val countsAndAverageRdd = getKeyValueRatings(getCollectionFromMongoRdd(ratingsCollectionName_))
+      .filter{ case(userId, (bookId, rate)) => rate != 0.0 }
       .map { case(userId, (bookId, rate)) => (bookId, (1, List(rate))) }
       .reduceByKey {
         case ((numberOfRates1, rateList1), (numberOfRates2, rateList2)) =>

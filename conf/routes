@@ -15,9 +15,6 @@ GET        /profile                           @controllers.Application.profileIn
 
 GET        /assets/javascripts/routes         @controllers.BookPageController.javascriptRoutes()
 
-
-GET        /only-twitter        @controllers.Application.onlyTwitter
-GET        /current-user        @controllers.Application.currentUser
 GET        /custom/login        @controllers.CustomLoginController.login
 GET        /custom/logout       @controllers.CustomLoginController.logout
 

@@ -14,55 +14,69 @@ import scala.collection.mutable
 class HybridNearestNeighboursRecommender @Inject()(configuration: Configuration)
   extends MlLibAlsSparkRatingsRecommender(configuration) with java.io.Serializable {
 
-  val numbersOfNeighboursList = List(50, 100, 150)
+  val numbersOfNeighboursList = List(25, 30, 35, 40, 45)
 
   private var numberOfNeighboursToFind_ = 50
 
-  private def tuneNumberOfNeighboursWithGridSearch(): Unit = {
-    initializeNeighboursRdd(numberOfNeighboursToFind_)
-    if (trainRatingsRddOption_.isDefined && neighboursRdd.isDefined &&
+  protected var meansAndDeviationsRddOption_ : Option[RDD[(Int, (Double, Double))]] = None
+  private var neighboursRddOption_ : Option[RDD[(Int, Array[(Int, Double)])]] = None
+
+
+  override def test(): Unit = {
+    initialize(isTuningParameters = true, getMaeForRdd)
+    /*    println("Train RMSE = " + getRmseForRdd(trainRatingsRddOption_.get))*/
+    tuneNumberOfNeighboursWithGridSearch(getMaeForRdd)
+    println("Test RMSE = " + getMaeForRdd(testRatingsRddOption_.get))
+    neighboursRddOption_.get.unpersist()
+    trainRatingsRddOption_.get.unpersist()
+    validationRatingsRddOption_.get.unpersist()
+    meansAndDeviationsRddOption_.get.unpersist()
+  }
+
+  private def tuneNumberOfNeighboursWithGridSearch(evaluateMetric: RDD[Rating] => Double): Unit = {
+    initializeNeighboursRdd(numberOfNeighboursToFind_, cosineSimilarity)
+    initializeMeansAndDeviationsRdd()
+    if (trainRatingsRddOption_.isDefined && neighboursRddOption_.isDefined &&
       validationRatingsRddOption_.isDefined) {
 
-      var currentBestValidationRmse = getRmseForRdd(validationRatingsRddOption_.get)
+      var currentBestValidationRmse = evaluateMetric(validationRatingsRddOption_.get)
 
       for (numberOfNeighbours <- numbersOfNeighboursList) {
-        initializeNeighboursRdd(numberOfNeighbours)
-        val validationRmse = getRmseForRdd(validationRatingsRddOption_.get)
-        println("RMSE (validation) = " + validationRmse + " for the model trained with " +
+        initializeNeighboursRdd(numberOfNeighbours, cosineSimilarity)
+        val validationMetric = evaluateMetric(validationRatingsRddOption_.get)
+        println("Metric (validation) = " + validationMetric + " for the model trained with " +
           "number of neighbours = " + numberOfNeighbours + ".")
-        if (validationRmse < currentBestValidationRmse) {
-          currentBestValidationRmse = validationRmse
+        if (validationMetric < currentBestValidationRmse) {
+          currentBestValidationRmse = validationMetric
           numberOfNeighboursToFind_ = numberOfNeighbours
         }
       }
       println("The best model was trained with number = " + numberOfNeighboursToFind_
-        + ", and its RMSE on the test set is " + currentBestValidationRmse + ".")
+        + ", and its metric on the test set is " + evaluateMetric(testRatingsRddOption_.get) + ".")
     }
     else {
       throw new IllegalStateException()
     }
   }
 
-  private var neighboursRdd: Option[RDD[(Int, Array[(Int, Double)])]] = None
-
-  override def test(): Unit = {
-    initialize(isTuningParameters = false, isInitializingValidationRdd = true,
-      isInitializingTestRdd = true)
-    initializeNeighboursRdd(numberOfNeighboursToFind_)
-    /*    println("Train RMSE = " + getRmseForRdd(trainRatingsRddOption_.get))*/
-    println("Validation RMSE = " + getRmseForRdd(validationRatingsRddOption_.get))
-    neighboursRdd.get.unpersist()
-    trainRatingsRddOption_.get.unpersist()
-    validationRatingsRddOption_.get.unpersist()
+  override def tuneHyperParametersWithRandomSearch(evaluateMetric: RDD[Rating] => Double): Unit = {
+    initializeMeansAndDeviationsRdd()
+    super.tuneHyperParametersWithRandomSearch(evaluateMetric)
   }
 
-  def initializeNeighboursRdd(numberOfNeighbours: Int) = {
+  override def tuneHyperParametersWithGridSearch(evaluateMetric: RDD[Rating] => Double): Unit = {
+    initializeMeansAndDeviationsRdd()
+    super.tuneHyperParametersWithGridSearch(evaluateMetric)
+  }
+
+  def initializeNeighboursRdd(numberOfNeighbours: Int,
+                              similarityMeasure: (Array[Double], Array[Double]) => Option[Double]) = {
     val userFeaturesRdd = getUserFeaturesRdd
 
     val joinedRdd = userFeaturesRdd.cartesian(userFeaturesRdd)
       .filter(tuple => tuple._1._1 < tuple._2._1)
       .map { case ((user1, features1), (user2, features2)) =>
-        ((user1, user2), cosineSimilarity(features1, features2))
+        ((user1, user2), similarityMeasure(features1, features2))
       }.flatMapValues(x => x)
       .map(x => Array((x._1._1, (x._1._2, x._2)), (x._1._2, (x._1._1, x._2))))
       .flatMap(x => x)
@@ -71,54 +85,77 @@ class HybridNearestNeighboursRecommender @Inject()(configuration: Configuration)
         val arrayOfNeighbours = resLine._2.toArray.sortBy(_._2).reverse.take(numberOfNeighbours)
         (resLine._1, arrayOfNeighbours)
       }
-    neighboursRdd = Some(joinedRdd.persist())
+    neighboursRddOption_ = Some(joinedRdd.persist())
   }
 
-  def getNeighbours(userId: Int): Array[Int] = {
-    val sequenceUserNeighbours = neighboursRdd.get.lookup(userId)
-    if (sequenceUserNeighbours.size == 1) sequenceUserNeighbours.head.map(_._1)
-    else throw new Exception("Wrong number")
-  }
-
-  override def predict(userId: Int, bookId: Int): Double = {
-    val broadcastNeighboursVar = SparkCommons.sc.broadcast(getNeighbours(userId))
-
-    val filteredRatings = trainRatingsRddOption_.get.filter {
-      case Rating(userId, book, rate) => broadcastNeighboursVar.value.contains(userId) && bookId == book
-    }
-      .map(_.rating)
-    filteredRatings.mean()
+  def initializeMeansAndDeviationsRdd(): Unit = {
+    meansAndDeviationsRddOption_ = Some(getDeviationAndAveragesRdd(trainRatingsRddOption_.get).persist())
   }
 
   override def predict(userProducts: RDD[(Int, Int)]): RDD[Rating] = {
-    val inputRdd = getUnitedInputRdd().cache()
-    val meansAndDeviationsRdd = getDeviationAndAveragesRdd(inputRdd).cache()
+    predictWithZScore(userProducts)
+  }
 
-    val neighbourBookUserRdd = getAveragesAndDeviationsForUsers(userProducts, meansAndDeviationsRdd)
-      .join(neighboursRdd.get)
-      .map { case (user, ((book, average, deviation), neighbours)) => ((user, book, average, deviation), neighbours) }
+  private def predictWithZScore(userProducts: RDD[(Int, Int)]): RDD[Rating] = {
+    initializeNeighboursRdd(numberOfNeighboursToFind_, cosineSimilarity)
+
+    val neighbourBookUserRdd = getAveragesAndDeviationsForUsers(userProducts,
+      meansAndDeviationsRddOption_.get)
+      .join(neighboursRddOption_.get)
+      .map { case (user, ((book, average, deviation), neighbours)) =>
+        ((user, book, average, deviation), neighbours)
+      }
       .flatMapValues(x => x)
       .map { case ((user, book, average, deviation), (neighbour, similarity)) =>
         ((neighbour, book), (user, average, deviation, similarity))
       }
-
-    val mapped = zScoreNormalization(inputRdd, meansAndDeviationsRdd).map {
-      case Rating(user, book, rate) => ((user, book), rate)
-    }
-    inputRdd.unpersist()
-    meansAndDeviationsRdd.unpersist()
-    mapped.take(5).foreach(x => println("Normalized Rating:" + x))
+    val mapped = zScoreNormalization(trainRatingsRddOption_.get, meansAndDeviationsRddOption_.get)
+      .map {
+        case Rating(user, book, rate) => ((user, book), rate)
+      }
+    /*    mapped.take(5).foreach(x => println("Normalized Rating:" + x))*/
     val resRdd = neighbourBookUserRdd.join(mapped)
       .map { case ((neighbour, book), ((user, average, deviation, similarity), rate)) =>
-        ((user, book), Set((average, deviation, similarity, rate)))
+        ((user, book), List((average, deviation, similarity, rate)))
       }
-      .reduceByKey((leftSet, rightSet) => leftSet.++(rightSet))
-      .map { case ((user, book), setOfRates) => ((user, book),
-        calculatePredictedZScoreNormalizedRating(setOfRates))
+      .reduceByKey((leftList, rightList) => leftList.++(rightList))
+      .map { case ((user, book), listOfRates) => ((user, book),
+        calculatePredictedZScoreNormalizedRating(listOfRates))
       }
       .flatMapValues(x => x)
       .map { case ((user, book), rating) => new Rating(user, book, rating) }
-    resRdd.take(5).foreach(x => println("Final prediction:" + x))
+    /*    resRdd.take(5).foreach(x => println("Final prediction:" + x))*/
+    resRdd
+  }
+
+  private def predictWithoutNormalization(userProducts: RDD[(Int, Int)]): RDD[Rating] = {
+     initializeNeighboursRdd(numberOfNeighboursToFind_, cosineSimilarity)
+
+    val neighbourBookUserRdd = userProducts
+      .join(neighboursRddOption_.get)
+      .map { case (user, (book, neighbours)) =>
+        ((user, book), neighbours)
+      }
+      .flatMapValues(x => x)
+      .map { case ((user, book), (neighbour, similarity)) =>
+        ((neighbour, book), (user, similarity))
+      }
+    val mapped = trainRatingsRddOption_.get
+      .map {
+        case Rating(user, book, rate) => ((user, book), rate)
+      }
+    /*    mapped.take(5).foreach(x => println("Normalized Rating:" + x))*/
+    val resRdd = neighbourBookUserRdd.join(mapped)
+      .map { case ((neighbour, book), ((user, similarity), rate)) =>
+        ((user, book), List((similarity, rate)))
+      }
+      .reduceByKey((leftList, rightList) => leftList.++(rightList))
+      .map { case ((user, book), listOfRates) => ((user, book),
+        calculatePredictedRating(listOfRates))
+      }
+      .flatMapValues(x => x)
+      .map { case ((user, book), rating) => new Rating(user, book, rating) }
+    /*    resRdd.take(5).foreach(x => println("Final prediction:" + x))*/
     resRdd
   }
 
@@ -163,16 +200,15 @@ class HybridNearestNeighboursRecommender @Inject()(configuration: Configuration)
       }
     }*/
 
-  def calculatePredictedZScoreNormalizedRating(setOfSimilaritiesAndRates: Set[(Double, Double, Double, Double)])
+  def calculatePredictedZScoreNormalizedRating(listOfSimilaritiesAndRates: List[(Double, Double, Double, Double)])
   : Option[Double] = {
-    if (setOfSimilaritiesAndRates.size > 1) {
-      val arrayOfTuples = setOfSimilaritiesAndRates.toArray
-      val sumOfSimilarities = arrayOfTuples.map(_._3).sum
-      val normalizedSimilarities = arrayOfTuples.map {
-        case (average, standartDeviation, similarity, rate) => (similarity / sumOfSimilarities, rate)
+    if (listOfSimilaritiesAndRates.size > 1) {
+      val sumOfSimilarities = listOfSimilaritiesAndRates.map(_._3).sum
+      val normalizedSimilarities = listOfSimilaritiesAndRates.map {
+        case (average, standardDeviation, similarity, rate) => (similarity / sumOfSimilarities, rate)
       }
       val sum = (for {tuple <- normalizedSimilarities} yield tuple._1 * tuple._2).sum
-      val prediction = arrayOfTuples(0)._1 + arrayOfTuples(0)._2 * sum
+      val prediction = listOfSimilaritiesAndRates.head._1 + listOfSimilaritiesAndRates.head._2 * sum
       if (prediction.isNaN) {
         None
       }
@@ -185,11 +221,11 @@ class HybridNearestNeighboursRecommender @Inject()(configuration: Configuration)
     }
   }
 
-  /*  def calculatePredictedRating(setOfSimilaritiesAndRates: Set[(Double, Double)])
+    def calculatePredictedRating(listOfSimilaritiesAndRates: List[(Double, Double)])
     : Option[Double] = {
-      if (setOfSimilaritiesAndRates.size > 1) {
-        val sumOfSimilarities = setOfSimilaritiesAndRates.map(_._2).sum
-        val normalizedSimilarities = setOfSimilaritiesAndRates.map {
+      if (listOfSimilaritiesAndRates.size > 1) {
+        val sumOfSimilarities = listOfSimilaritiesAndRates.map(_._2).sum
+        val normalizedSimilarities = listOfSimilaritiesAndRates.map {
           case (similarity, rate) => (similarity / sumOfSimilarities, rate)
         }
         Some((for {tuple <- normalizedSimilarities} yield tuple._1 * tuple._2).sum)
@@ -197,7 +233,7 @@ class HybridNearestNeighboursRecommender @Inject()(configuration: Configuration)
       else {
         None
       }
-    }*/
+    }
 
   /*  def meanCenteringNormalization(inputRatingsRdd: RDD[Rating]): RDD[Rating] = {
       def normalizedRdd = inputRatingsRdd.map {
@@ -246,34 +282,32 @@ class HybridNearestNeighboursRecommender @Inject()(configuration: Configuration)
   def getAveragesAndDeviationsForUsers(userIdsRdd: RDD[(Int, Int)],
                                        meansAndDeviationsRdd: RDD[(Int, (Double, Double))]):
   RDD[(Int, (Int, Double, Double))] = {
-    userIdsRdd.join(meansAndDeviationsRdd).map {
-      case (userId, (bookId, (average, deviation))) => (userId, (bookId, average, deviation))
-    }
+    userIdsRdd
+      .join(meansAndDeviationsRdd)
+      .map { case (userId, (bookId, (average, deviation)))
+      => (userId, (bookId, average, deviation))
+      }
   }
 
   def getDeviationAndAveragesRdd(inputRdd: RDD[Rating]): RDD[(Int, (Double, Double))] = {
-    val bookIdAverageAndDeviationRdd = transformToUserKeyRdd(inputRdd).map {
-      case (userId, (bookId, rate)) => (userId, Set(rate))
-    }
-      .reduceByKey((leftSet, rightSet) => leftSet.++(rightSet))
+    val bookIdAverageAndDeviationRdd = transformToUserKeyRdd(inputRdd)
+      .aggregateByKey(mutable.HashSet.empty[(Int, Double)])(addToSet, mergePartitionSets)
       .map {
-        case (userId, setOfPairs) =>
-          val rates = setOfPairs.toArray
-          val average = rates.sum / rates.size
-          (userId, rates.map {
-            case (rate) => (average, getDeviation(rates, average))
-          })
-      }.flatMapValues(x => x)
+        case (userId, setOfRates) =>
+          val listOfRates = setOfRates.toList.map(_._2)
+          val average = listOfRates.sum / listOfRates.size
+          (userId, (average, getDeviation(listOfRates, average)))
+      }
     bookIdAverageAndDeviationRdd
   }
 
-  def getDeviation(rates: Array[Double], mean: Double): Double = {
+  def getDeviation(rates: List[Double], mean: Double): Double = {
     val deviation = Math.sqrt((for {rate <- rates} yield Math.pow(rate - mean, 2)).sum
-      / rates.length - 1)
+      / rates.size - 1)
     deviation
   }
 
-  def getDeviation(rates: Array[Double]): Double = {
+  def getDeviation(rates: List[Double]): Double = {
     val mean = rates.sum / rates.size
     val deviation = Math.sqrt((for {rate <- rates} yield Math.pow(rate - mean, 2)).sum
       / rates.length - 1)

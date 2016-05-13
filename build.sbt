@@ -6,7 +6,7 @@ version := "1.0"
 
 lazy val `recbook` = (project in file(".")).enablePlugins(PlayScala)
 
-scalaVersion := "2.11.7"
+scalaVersion := "2.11.8"
 
 val sparkVersion = "1.6.1"
 

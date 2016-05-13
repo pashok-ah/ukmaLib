@@ -3,6 +3,8 @@ package spark
 import com.esotericsoftware.kryo.Kryo
 import org.apache.spark.serializer.KryoRegistrator
 
+import scala.reflect.ClassTag
+
 /**
   * Created by P. Akhmedzianov on 13.04.2016.
   */
@@ -12,6 +14,7 @@ class MyKryoRegistrator extends KryoRegistrator {
     kryo.register(classOf[MlLibAlsSparkRatingsRecommender])
     kryo.register(classOf[BookGlobalRatingsUpdater])
     kryo.register(classOf[ContentBasedSparkRatingsRecommender])
+    kryo.register(Class.forName("scala.reflect.ManifestFactory$$anon$1"))
     kryo.register(Class.forName("scala.collection.immutable.ListSet$Node"))
     kryo.register(Class.forName("scala.collection.immutable.ListSet$EmptyListSet$"))
     kryo.register(Class.forName("scala.collection.immutable.HashSet$HashSetCollision1"))
@@ -33,6 +36,7 @@ class MyKryoRegistrator extends KryoRegistrator {
     kryo.register(classOf[Array[Array[Float]]])
     kryo.register(classOf[Array[Array[Int]]])
     kryo.register(classOf[Array[Double]])
+    kryo.register(ClassTag(Class.forName("org.apache.spark.util.collection.CompactBuffer")).wrap.runtimeClass)
     kryo.register(classOf[Array[org.apache.spark.mllib.recommendation.Rating]])
   }
 }
