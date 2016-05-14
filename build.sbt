@@ -48,4 +48,4 @@ resolvers += Resolver.sonatypeRepo("releases")
 
 resolvers += "scalaz-bintray" at "https://dl.bintray.com/scalaz/releases"
 
-routesImport ++= Seq("scala.language.reflectiveCalls")
+routesImport ++= Seq("scala.language.reflectiveCalls", "controllers.SearchType._")

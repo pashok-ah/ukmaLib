@@ -1,23 +1,22 @@
-@(title: String, userName:String, userAvatarOption:Option[String])(content: Html)(implicit messages: Messages)
+@(title: String, userName: String, userAvatarOption: Option[String],
+        searchForm: Form[SearchData])(content: Html)(implicit messages: Messages)
+@import views.html.elements.text
 <html lang="en-US" xmlns="http://www.w3.org/1999/xhtml" dir="ltr">
     <head>
         <title>@Messages("appName") - @title</title>
         <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
-        <link rel="shortcut icon" href="/assets/images/favicon.ico" />
-        <link rel="stylesheet" href="/assets/stylesheets/style.css" type="text/css" media="all" />
-        <link rel="stylesheet" href="/assets/stylesheets/star-rating-svg.css" type="text/css" media="all" />
+        <link rel="shortcut icon" href="@routes.Assets.at("images/favicon.ico")" />
+        <link rel="stylesheet" href="@routes.Assets.at("stylesheets/style.css")" type="text/css" media="all" />
+        <link rel="stylesheet" href="@routes.Assets.at("stylesheets/star-rating-svg.css")" type="text/css" media="all" />
 
 
-        <script type="text/javascript" src="/assets/javascripts/jquery-2.0.0.min.js"></script>
-        <script type="text/javascript" src="/assets/javascripts/jquery.star-rating-svg.js"></script>
-        <script type="text/javascript" src="/assets/javascripts/jquery.jcarousel.min.js"></script>
-        <script type="text/javascript" src="/assets/javascripts/jQuery.dotdotdot.min.js"></script>
-
+        <script type="text/javascript" src="@routes.Assets.at("javascripts/jquery-2.0.0.min.js")"></script>
+        <script type="text/javascript" src="@routes.Assets.at("javascripts/jquery.star-rating-svg.js")"></script>
+        <script type="text/javascript" src="@routes.Assets.at("javascripts/jquery.jcarousel.min.js")"></script>
+        <script type="text/javascript" src="@routes.Assets.at("javascripts/jQuery.dotdotdot.min.js")"></script>
+        <script type="text/javascript" src="@routes.Assets.at("javascripts/jquery.color.js")"></script>
         <script type="text/javascript" src="@routes.BookPageController.javascriptRoutes()"></script>
-            <!--[if IE 6]>
-		<script type="text/javascript" src="/assets/javascripts/png-fix.js"></script>
-	<![endif]-->
-        <script type="text/javascript" src="/assets/javascripts/functions.js"></script>
+        <script type="text/javascript" src="@routes.Assets.at("javascripts/functions.js")"></script>
     </head>
     <body>
             <!-- Header -->
@@ -28,8 +27,8 @@
                 <ul>
                     <li><a href="/">Home</a></li>
                     <li><a href="#">Products</a></li>
-                    <li><a href="/recommendations">Recommendations</a></li>
-                    <li><a href="/profile">Profile</a></li>
+                    <li><a href="@routes.Application.recommendations()">Recommendations</a></li>
+                    <li><a href="@routes.Application.profileInfo()">Profile</a></li>
                     <li><a href="#">About Us</a></li>
                     <li><a href="#">Contacts</a></li>
                 </ul>
@@ -38,16 +37,29 @@
             <div class="cl">&nbsp;</div>
                 <!-- Login-details -->
             <div id="login-details">
-                @if(userName == "Guest"){
+                @if(userName == "Guest") {
                     <p>Welcome, Guest .</p>
                     @*<div id="user-name" value="Guest">*@
-                } else{
-                    <p>Welcome, <a href="/profile" id="user">@userName</a> .</p>
+                } else {
+                    <p>Welcome, <a href="@routes.Application.profileInfo()" id="user">@userName</a> .</p>
                 }
                 @userAvatarOption.map { case url =>
-                <p><img src="@url"  width="40px" height="40px"/></p>
-                    <p><a class="btn" href="@securesocial.controllers.routes.LoginPage.logout()">Logout</a></p>
+                <p><img src="@url" width="40px" height="40px"/></p>
+                <p><a class="btn" href="@securesocial.controllers.routes.LoginPage.logout()">Logout</a></p>
                 }
+            </div>
+            <div id="search-container">
+                <div id="search-main">
+                @helper.form(action = routes.SearchController.submitSearch, 'id -> "searchForm") {
+                    <fieldset>
+                        <div class="input">
+                            @text(searchForm("searchRequest"))
+                            <input type="submit" id="searchSubmit" value="" />
+                        </div>
+
+                    </fieldset>
+                }
+                </div>
             </div>
                 <!-- End Login-details -->
         </div>

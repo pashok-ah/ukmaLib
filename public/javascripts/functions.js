@@ -73,6 +73,8 @@ $(function() {
         wrap: 'both'
     });
 
+
+
     $("#global-rating").starRating({
         totalStars: 10,
         starSize: 18,
@@ -131,8 +133,6 @@ $(function() {
 
     var myStarRating = $("#my-rating").starRating(defaultForMyRating);
 
-
-
     $( "#delete-rate-button" ).click(function() {
         var ratingToDelete = $( "#my-rating").data('myrating-objectid');
         var ajaxUrl = jsRoutes.controllers.BookPageController.deleteTheRateAjaxCall(ratingToDelete);
@@ -156,8 +156,49 @@ $(function() {
         $("#delete-rate-button").hide();
     };
 
-
-
+    var input = $('input#searchRequest');
+    var divInput = $('div.input');
+    var width = divInput.width();
+    var outerWidth = divInput.parent().width() - (divInput.outerWidth() - width) - 28;
+    var submit = $('#searchSubmit');
+    var txt = input.val();
+    input.bind('focus', function() {
+        if(input.val() === txt) {
+            input.val('');
+        }
+        $(this).animate({color: '#000'}, 300); // text color
+        $(this).parent().animate({
+            width: outerWidth + 'px',
+            backgroundColor: '#fff', // background color
+            paddingRight: '43px'
+        }, 300, function() {
+            if(!(input.val() === '' || input.val() === txt)) {
+                    submit.css({display: 'block'});
+            }
+        }).addClass('focus');
+    }).bind('blur', function() {
+        $(this).animate({color: '#b4bdc4'}, 300); // text color
+        $(this).parent().animate({
+            width: width + 'px',
+            backgroundColor: '#e8edf1', // background color
+            paddingRight: '15px'
+        }, 300, function() {
+            if(input.val() === '') {
+                input.val(txt)
+            }
+        }).removeClass('focus');
+        if(!($.browser.msie && $.browser.version < 9)) {
+            submit.fadeOut(100);
+        } else {
+            submit.css({display: 'none'});
+        }
+    }).keyup(function() {
+        if(input.val() === '') {
+                submit.css({display: 'none'});
+        } else {
+                submit.css({display: 'block'});
+        }
+    });
 /*     if ($.browser.msie && $.browser.version.substr(0,1)<7) {
         DD_belatedPNG.fix('#logo h1 a, .read-more-btn, #slider .image img, #book-list .jcarousel-prev, #best-sellers .jcarousel-next, #slider .jcarousel-container, #best-sellers .price, .shell, #footer, .products ul li a:hover');
     }*/

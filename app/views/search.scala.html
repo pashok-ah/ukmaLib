@@ -1,0 +1,30 @@
+@(userName: String, userAvatarOption: Option[String],
+        flatBookList:List[Book], searchForm:Form[SearchData] )(implicit messages: Messages,
+        env: securesocial.core.RuntimeEnvironment)
+
+@main("Search Result", userName, userAvatarOption, searchForm:Form[SearchData]) {
+    <div id="main" class="shell">
+            <!-- Sidebar -->
+        @views.html.elements.sidebar()
+            <!-- End Sidebar -->
+            <!-- Content -->
+        <div id="content">
+                <!-- Products -->
+                @if(flatBookList.nonEmpty){
+                    @views.html.elements.flatBookList("Found books:", flatBookList)
+                }else{
+                    @views.html.elements.flatBookList("Books not found!", flatBookList)
+                }
+
+                <!-- End Products -->
+            <div class="cl">&nbsp;</div>
+                <!-- Best-sellers -->
+            <div class="center">
+
+            </div>
+                <!-- End Best-sellers -->
+        </div>
+            <!-- End Content -->
+        <div class="cl">&nbsp;</div>
+    </div>
+}

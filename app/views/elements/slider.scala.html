@@ -16,7 +16,7 @@
                         }else {
                             <p class="description-slider">No description.</p>
                         }
-                        <a href="/book/@book._id" class="read-more-btn">Read More</a>
+                        <a href="@routes.BookPageController.getBook(book._id.get)" class="read-more-btn">Read More</a>
                     </div>
                 </li>
             }

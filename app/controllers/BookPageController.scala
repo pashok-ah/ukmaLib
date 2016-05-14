@@ -13,7 +13,6 @@ import services.mongo._
 import services.secsocial.MyEnvironment
 
 import scala.concurrent.Future
-import scala.concurrent.duration._
 
 /**
   * Created by P. Akhmedzianov on 05.04.2016.
@@ -24,8 +23,6 @@ class BookPageController @Inject()(override implicit val env: MyEnvironment,
                                    bookInfoProvider: BookInfoProvider)
   extends securesocial.core.SecureSocial {
   val additionalInfoLoader_ = new AdditionalBooksInfoLoaderGoogleAPI()
-  val awaitDuration_ = 5 seconds
-
 
   def isRateInBorders(rate: Double): Boolean = rate > 0 && rate <= 10
 
@@ -65,10 +62,11 @@ class BookPageController @Inject()(override implicit val env: MyEnvironment,
           book = book.copy(description = Some(handleBookDescription(book.isbn, book._id.get)))
         }
         Ok(views.html.book(book, similarBooksList , youMayAlsoLikeBooksList, rateOption, userName,
-          userAvatarUrlOption))
+          userAvatarUrlOption, SearchData.searchForm))
       }
       else {
-        NotFound(views.html.errors.error("Book not found", request.uri, userName, userAvatarUrlOption))
+        NotFound(views.html.errors.error("Book not found", request.uri, userName,
+          userAvatarUrlOption, SearchData.searchForm))
       }
     }
   }

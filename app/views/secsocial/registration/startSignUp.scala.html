@@ -1,8 +1,9 @@
-@(startForm:Form[String])(implicit request: RequestHeader, messages: Messages, env: securesocial.core.RuntimeEnvironment)
+@(startForm:Form[String], searchForm:Form[SearchData])(implicit request: RequestHeader,
+        messages: Messages, env: securesocial.core.RuntimeEnvironment)
 @import helper._
 @implicitFieldConstructor = @{ FieldConstructor(securesocial.views.html.inputFieldConstructor.f) }
 
-@views.html.main( Messages("securesocial.signup.title"), "Guest", None) {
+@views.html.main( Messages("securesocial.signup.title"), "Guest", None, searchForm:Form[SearchData]) {
     <div id="main" class="shell">
     <div class="page-header">
         <h1>@Messages("securesocial.signup.title")</h1>

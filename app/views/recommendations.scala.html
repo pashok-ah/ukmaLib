@@ -1,8 +1,8 @@
 @(userName: String, userAvatarOption: Option[String],
-        flatBookList:List[Book])(implicit messages: Messages,
+        flatBookList:List[Book], searchForm:Form[SearchData] )(implicit messages: Messages,
         env: securesocial.core.RuntimeEnvironment)
 
-@main("Personal Recommendations", userName, userAvatarOption) {
+@main("Personal Recommendations", userName, userAvatarOption, searchForm:Form[SearchData]) {
     <div id="main" class="shell">
     <!-- Sidebar -->
     @views.html.elements.sidebar()

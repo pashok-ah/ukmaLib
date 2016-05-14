@@ -1,8 +1,8 @@
-@(userBasicProfile: securesocial.core.BasicProfile/*, recs: Map[Int, Double]*/)(implicit request: RequestHeader,
+@(userBasicProfile: securesocial.core.BasicProfile, searchForm:Form[SearchData])(implicit request: RequestHeader,
         env: securesocial.core.RuntimeEnvironment,messages: Messages)
 
     @main("SecureSocial - Sample Protected Page", userBasicProfile.fullName.get,
-        userBasicProfile.avatarUrl) {
+        userBasicProfile.avatarUrl, searchForm:Form[SearchData]) {
         <div id="main" class="shell">
         <div class="page-header">
             <h2><img src="@userBasicProfile.avatarUrl.getOrElse("")"

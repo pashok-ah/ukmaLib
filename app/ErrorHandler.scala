@@ -1,5 +1,6 @@
 import javax.inject._
 
+import controllers.SearchData
 import play.api._
 import play.api.http.DefaultHttpErrorHandler
 import play.api.mvc.Results._
@@ -20,16 +21,16 @@ class ErrorHandler @Inject() (
 
   override def onProdServerError(request: RequestHeader, exception: UsefulException) = {
     Future.successful(InternalServerError(views.html.errors.error("A server error occurred: " +
-      exception.getMessage, "", "Guest", None)))
+      exception.getMessage, "", "Guest", None, SearchData.searchForm)))
   }
 
   override def onForbidden(request: RequestHeader, message: String) = {
     Future.successful(Forbidden(views.html.errors.error("You're not allowed to access this resource.",
-      request.path, "Guest", None)))
+      request.path, "Guest", None, SearchData.searchForm)))
   }
 
   override def onNotFound(request: RequestHeader, message: String): Future[Result] = {
     Future.successful(NotFound(views.html.errors.error("Page not found",
-      request.path, "Guest", None)))
+      request.path, "Guest", None, SearchData.searchForm)))
   }
 }

@@ -53,18 +53,18 @@ class Application @Inject()(override implicit val env: MyEnvironment,
         userAvatarUrlOption = user.main.avatarUrl
       }
       Ok(views.html.index(userName, userAvatarUrlOption, sliderBooks,
-        indexFlatList)(implicitly[Messages], implicitly[MyEnvironment]))
+        indexFlatList, SearchData.searchForm)(implicitly[Messages], implicitly[MyEnvironment]))
     }
   }
 
   def profileInfo = SecuredAction.async { implicit request =>
-    Future(Ok(views.html.profile(request.user.main)))
+    Future(Ok(views.html.profile(request.user.main, SearchData.searchForm)))
   }
 
   def recommendations = SecuredAction.async { implicit request =>
     bookInfoProvider.getBookEntitiesByIdArray(request.user.personalRecommendations).map(
       recommendations => Ok(views.html.recommendations(request.user.main.fullName.get,
-        request.user.main.avatarUrl, recommendations)(implicitly[Messages],
+        request.user.main.avatarUrl, recommendations, SearchData.searchForm)(implicitly[Messages],
         implicitly[MyEnvironment]))
     )
   }

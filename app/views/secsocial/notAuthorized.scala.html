@@ -1,9 +1,10 @@
-@()(implicit request: RequestHeader, lang: Lang, env: securesocial.core.RuntimeEnvironment)
+@(searchForm:Form[SearchData])(implicit request: RequestHeader, lang: Lang,
+        env: securesocial.core.RuntimeEnvironment)
 @import play.api.Play.current
 @import play.api.i18n.Messages.Implicits._
 @import play.i18n._
 @views.html.main(play.i18n.Messages.get("securesocial.notAuthorized.title"), "Guest",
-    None) {
+    None, searchForm:Form[SearchData]) {
     <div id="main" class="shell">
     <div class="page-header">
         <h1>@Messages.get("securesocial.notAuthorized.title")</h1>

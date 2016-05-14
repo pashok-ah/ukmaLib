@@ -1,8 +1,8 @@
 @(userName: String, userAvatarOption: Option[String], sliderList:List[Book],
-        flatBookList:List[Book])(implicit messages: Messages,
+        flatBookList:List[Book], searchForm:Form[SearchData])(implicit messages: Messages,
         env: securesocial.core.RuntimeEnvironment)
 
-@main("Index page", userName, userAvatarOption) {
+@main("Index page", userName, userAvatarOption, searchForm:Form[SearchData]) {
     @views.html.elements.slider(sliderList)
     <!-- Sidebar -->
     <div id="main" class="shell">

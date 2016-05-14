@@ -7,7 +7,7 @@
             @for(book <- bookList) {
                 <li>
                     <div class="product">
-                        <a href="/book/@book._id" class="info">
+                        <a href="@routes.BookPageController.getBook(book._id.get)" class="info">
                             <span class="holder">
                                 <img src="@book.imageURLMedium" alt="" />
                                 <span class="book-name">@book.bookTitle</span>
