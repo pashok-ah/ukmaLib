@@ -1,7 +1,7 @@
 <alsConfiguration>
-      <rank>12</rank>
+      <rank>20</rank>
       <numIterations>30</numIterations>
-      <lambda>8.750732843956996</lambda>
+      <lambda>0.6151658753014175</lambda>
       <trainingShare>0.6</trainingShare>
       <validationShare>0.5</validationShare>
       <ranks>

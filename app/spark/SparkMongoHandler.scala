@@ -9,6 +9,7 @@ import org.apache.spark.rdd.RDD
 import org.bson.BSONObject
 
 import scala.collection.mutable
+import scala.language.higherKinds
 
 /**
   * Created by P. Akhmedzianov on 03.03.2016.
@@ -82,23 +83,37 @@ abstract class SparkMongoHandler(configuration: play.api.Configuration)
 
   def mergePartitionSets[T](p1: mutable.HashSet[T],
                             p2: mutable.HashSet[T]): mutable.HashSet[T] = p1 ++= p2
+
+  def addToBuffer[T](s: mutable.ArrayBuffer[T], v: T): mutable.ArrayBuffer[T] = s += v
+
+  def mergePartitionBuffers[T](p1: mutable.ArrayBuffer[T],
+                               p2: mutable.ArrayBuffer[T]): mutable.ArrayBuffer[T] = p1 ++= p2
 }
 
 trait EvaluationMetrics{
   def predict(userProducts:RDD[(Int, Int)]):RDD[Rating]
 
   def getRmseForRdd(ratings: RDD[Rating]): Double = {
-    // Evaluate the model on rating data
     val usersProducts = ratings.map { case Rating(user, product, rate) =>
       (user, product)
     }
-    val predictions =
-      predict(usersProducts).map { case Rating(user, product, rate) =>
+    getRmseWithPredictionsRdd(ratings, predict(usersProducts))
+  }
+
+  def getMaeForRdd(ratings: RDD[Rating]): Double = {
+    val usersProducts = ratings.map { case Rating(user, product, rate) =>
+      (user, product)
+    }
+    getMaeWithPredictionsRdd(ratings, predict(usersProducts))
+  }
+
+  def getRmseWithPredictionsRdd(ratings: RDD[Rating], predictions: RDD[Rating]): Double = {
+    val predictionsRdd = predictions.map { case Rating(user, product, rate) =>
         ((user, product), rate)
       }
     val ratesAndPredictions = ratings.map { case Rating(user, product, rate) =>
       ((user, product), rate)
-    }.join(predictions)
+    }.join(predictionsRdd)
     val meanSquaredError = ratesAndPredictions.map { case ((user, product), (r1, r2)) =>
       val err = r1 - r2
       err * err
@@ -106,18 +121,13 @@ trait EvaluationMetrics{
     Math.sqrt(meanSquaredError)
   }
 
-  def getMaeForRdd(ratings: RDD[Rating]): Double = {
-    // Evaluate the model on rating data
-    val usersProducts = ratings.map { case Rating(user, product, rate) =>
-      (user, product)
-    }
-    val predictions =
-      predict(usersProducts).map { case Rating(user, product, rate) =>
+  def getMaeWithPredictionsRdd(ratings: RDD[Rating], predictions: RDD[Rating]): Double = {
+    val predictionsRdd = predictions.map{ case Rating(user, product, rate) =>
         ((user, product), rate)
       }
     val ratesAndPredictions = ratings.map { case Rating(user, product, rate) =>
       ((user, product), rate)
-    }.join(predictions)
+    }.join(predictionsRdd)
     val meanAverageError = ratesAndPredictions.map { case ((user, product), (r1, r2)) =>
       val err = r1 - r2
       Math.abs(err)

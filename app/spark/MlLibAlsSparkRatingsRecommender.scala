@@ -39,7 +39,7 @@ class MlLibAlsSparkRatingsRecommender @Inject()(val configuration: Configuration
   protected var testRatingsRddOption_ : Option[RDD[Rating]] = None
 
   def updateRecommendationsInMongo(isTuning: Boolean): Unit = {
-    initialize(isTuning)
+    initialize(isTuning, getRmseForRdd)
     exportAllPredictionsToMongo(numberOfRecommendedBooks_)
         trainRatingsRddOption_.get.unpersist()
     if (isTuning) {
@@ -65,10 +65,10 @@ class MlLibAlsSparkRatingsRecommender @Inject()(val configuration: Configuration
     initializeRdds(filterInputByNumberOfKeyEntriesRdd(getKeyValueRatings(
       getCollectionFromMongoRdd(ratingsCollectionName_)), minNumberOfRatesToGetRecommendations_),
       isTuningParameters)
-    if (isTuningParameters) {
+/*    if (isTuningParameters) {
       tuneHyperParametersWithGridSearch(evaluateMetric)
       tuneHyperParametersWithRandomSearch(evaluateMetric)
-    }
+    }*/
     initializeModelWithRdd(trainRatingsRddOption_.get)
   }
 
@@ -94,14 +94,16 @@ class MlLibAlsSparkRatingsRecommender @Inject()(val configuration: Configuration
         }.flatMapValues(x => x)
 
       trainRatingsRddOption_ = Some(transformToRatingRdd(trainRdd).persist())
-
+      println("Train size: "+trainRatingsRddOption_.get.count())
       val afterSubtractionRdd = filteredInputRdd.subtract(trainRdd)
 
       val validateAndTestRdds = afterSubtractionRdd.randomSplit(
         Array(alsConfigurationOption_.get.validationShareAfterSubtractionTraining_,
           1 - alsConfigurationOption_.get.validationShareAfterSubtractionTraining_))
       validationRatingsRddOption_ = Some(transformToRatingRdd(validateAndTestRdds(0)).persist())
+      println("Validation size: "+validationRatingsRddOption_.get.count())
       testRatingsRddOption_ = Some(transformToRatingRdd(validateAndTestRdds(1)).persist())
+      println("Test size: "+testRatingsRddOption_.get.count())
     }
     else {
       trainRatingsRddOption_ = Some(transformToRatingRdd(filteredInputRdd).persist())
