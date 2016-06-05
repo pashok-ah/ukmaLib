@@ -3,32 +3,32 @@
 
 
 # Home page
-GET        /                                  @controllers.Application.index
-GET        /recommendations                   @controllers.Application.recommendations
-GET        /book/:bookId                      @controllers.BookPageController.getBook(bookId:Int)
+GET        /                                       @controllers.Application.index
+GET        /recommendations                        @controllers.Application.recommendations
+GET        /book/$bookId<[0-9]+>                   @controllers.BookPageController.getBook(bookId:Int)
 
-GET        /search/:optionId=:bookIdValue     @controllers.SearchController.searchBook(optionId:String, bookIdValue:String)
-POST       /search                            @controllers.SearchController.submitSearch()
+GET        /search/:optionId                       @controllers.SearchController.searchBook(optionId:String, searchValue:String)
+POST       /search                                 @controllers.SearchController.submitSearch()
 
 
-PUT        /book/:bookId/:rate                @controllers.BookPageController.saveTheRateAjaxCall(bookId:Int, rate:Double)
-POST       /rating/:id/:rate                  @controllers.BookPageController.updateTheRateAjaxCall(id:String, rate:Double)
-DELETE     /rating/deletebyid/:id             @controllers.BookPageController.deleteTheRateAjaxCall(id:String)
+PUT        /book/$bookId<[0-9]+>/$rate<[0-9]+>     @controllers.BookPageController.saveTheRateAjaxCall(bookId:Int, rate:Double)
+POST       /rating/$id<[0-9]+>/$rate<[0-9]+>       @controllers.BookPageController.updateTheRateAjaxCall(id:String, rate:Double)
+DELETE     /rating/deletebyid/$id<[0-9]+>          @controllers.BookPageController.deleteTheRateAjaxCall(id:String)
 
-GET        /profile                           @controllers.Application.profileInfo
+GET        /profile                                @controllers.Application.profileInfo
 
-GET        /assets/javascripts/routes         @controllers.BookPageController.javascriptRoutes()
+GET        /assets/javascripts/routes              @controllers.BookPageController.javascriptRoutes()
 
-GET        /custom/login        @controllers.CustomLoginController.login
-GET        /custom/logout       @controllers.CustomLoginController.logout
+GET        /custom/login                           @controllers.CustomLoginController.login
+GET        /custom/logout                          @controllers.CustomLoginController.logout
 
-GET        /import/users        @controllers.ImportController.importUsers
-GET        /import/books        @controllers.ImportController.importBooks
-GET        /import/ratings      @controllers.ImportController.importRatings
+GET        /import/users                           @controllers.ImportController.importUsers
+GET        /import/books                           @controllers.ImportController.importBooks
+GET        /import/ratings                         @controllers.ImportController.importRatings
 
 # Map static resources from the /public folder to the /assets URL path
-GET        /assets/*file        controllers.Assets.at(path="/public", file)
-->         /auth                securesocial.Routes
+GET        /assets/*file                           controllers.Assets.at(path="/public", file)
+->         /auth                                   securesocial.Routes
 
 
     

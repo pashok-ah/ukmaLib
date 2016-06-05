@@ -1,5 +1,3 @@
-
-
 name := "RecBook"
 
 version := "1.0"

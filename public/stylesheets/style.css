@@ -97,7 +97,7 @@ textarea { overflow: auto; }
 .product .book-name { font-size: 12px; line-height: 20px; color: #0182b5; font-family: 'Georgia', Arial, serif; display: block;   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
 .product .author { font-size: 11px; line-height: 14px; color: #3d3d3d; font-family: 'Georgia', Arial, serif; padding: 0 0 9px 1px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
 .product .description { font-size: 11px; line-height: 16px; height: 60px; color: #878787; }
-.product .truncate-description {width: 120px; height: 70px; overflow: hidden;}
+.product .truncate-description {width: 120px; height: 70px; }
 
 
 #book-list { padding-top: 18px; width: 100%; position: relative; }
@@ -204,7 +204,7 @@ div.input.focus {
     box-shadow:0 0 6px #abdcff, inset 0 1px 2px rgba(0,0,0,0.08);
 }
 
-input#searchRequest {
+input#searchValue {
     width:100%;
     border:0;
     background:transparent;
@@ -213,7 +213,7 @@ input#searchRequest {
     text-shadow:0 1px 1px #fff;
 }
 
-input#searchRequest:focus {
+input#searchValue:focus {
     outline:none
 }
 

@@ -156,7 +156,7 @@ $(function() {
         $("#delete-rate-button").hide();
     };
 
-    var input = $('input#searchRequest');
+    var input = $('input#searchValue');
     var divInput = $('div.input');
     var width = divInput.width();
     var outerWidth = divInput.parent().width() - (divInput.outerWidth() - width) - 28;
