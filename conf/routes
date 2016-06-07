@@ -11,9 +11,9 @@ GET        /search/:optionId                       @controllers.SearchController
 POST       /search                                 @controllers.SearchController.submitSearch()
 
 
-PUT        /book/$bookId<[0-9]+>/$rate<[0-9]+>     @controllers.BookPageController.saveTheRateAjaxCall(bookId:Int, rate:Double)
-POST       /rating/$id<[0-9]+>/$rate<[0-9]+>       @controllers.BookPageController.updateTheRateAjaxCall(id:String, rate:Double)
-DELETE     /rating/deletebyid/$id<[0-9]+>          @controllers.BookPageController.deleteTheRateAjaxCall(id:String)
+PUT        /book/$bookId<[0-9]+>/:rate             @controllers.BookPageController.saveTheRateAjaxCall(bookId:Int, rate:Double)
+POST       /rating/:id/:rate                       @controllers.BookPageController.updateTheRateAjaxCall(id:String, rate:Double)
+DELETE     /rating/deletebyid/:id                  @controllers.BookPageController.deleteTheRateAjaxCall(id:String)
 
 GET        /profile                                @controllers.Application.profileInfo
 
